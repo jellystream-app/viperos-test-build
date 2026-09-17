@@ -49,9 +49,14 @@ jobs:
 
       - name: Install validation tools
         run: |
+          # Bewusst OHNE live-build: Ubuntu liefert einen Fork (3.0~a57) mit
+          # anderem Optionssatz als Debian (1:20250505). Ein "lb config"-Test
+          # gegen das Ubuntu-Paket wuerde Optionen als unbekannt melden, die im
+          # Trixie-Container voellig in Ordnung sind. Der lb-config-Test laeuft
+          # deshalb weiter unten im echten debian:trixie-Container.
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            debian-archive-keyring live-build curl ca-certificates
+            debian-archive-keyring curl ca-certificates
 
       - name: CRLF check
         run: |
@@ -178,18 +183,35 @@ jobs:
             exit 1
           fi
 
-      - name: lb config dry run
+      - name: lb config dry run (in debian:trixie)
         run: |
-          # Prueft die Optionen in auto/config, ohne eine ISO zu bauen.
-          T=$(mktemp -d)
-          cp -a build/lb-config/auto "$T/auto"
-          chmod 0755 "$T/auto/config"
-          ( cd "$T" && bash auto/config )
-          grep -hE 'LB_DISTRIBUTION=|LB_UEFI_SECURE_BOOT|LB_IMAGE_TYPE|LB_BOOTLOADERS|LB_CHROOT_SQUASHFS_COMPRESSION_TYPE' \
-            "$T"/config/* | sort -u
-          # Die Basis muss Trixie sein, unabhaengig vom Runner-Image.
-          grep -q 'LB_DISTRIBUTION="trixie"' "$T"/config/bootstrap \
-            || { echo "::error::auto/config setzt nicht Trixie"; exit 1; }
+          # MUSS im Trixie-Container laufen, nicht auf dem Ubuntu-Runner:
+          # Ubuntus live-build ist ein Fork (3.0~a57) und kennt --bootloaders,
+          # --uefi-secure-boot, --image-name und
+          # --chroot-squashfs-compression-type nicht. Debians live-build
+          # (1:20250505) kennt sie - und genau das baut spaeter die ISO.
+          docker run --rm -v "$PWD:/src:ro" -e DEBIAN_FRONTEND=noninteractive \
+            debian:trixie bash -euo pipefail -c '
+              apt-get update -qq
+              apt-get install -y --no-install-recommends live-build >/dev/null
+              echo "live-build: $(dpkg-query -W -f="\${Version}" live-build)"
+
+              T=$(mktemp -d)
+              cp -a /src/build/lb-config/auto "$T/auto"
+              chmod 0755 "$T/auto/config"
+              ( cd "$T" && bash auto/config )
+
+              grep -hE "LB_DISTRIBUTION=|LB_UEFI_SECURE_BOOT|LB_IMAGE_TYPE|LB_BOOTLOADERS|LB_CHROOT_SQUASHFS_COMPRESSION_TYPE" \
+                "$T"/config/* | sort -u
+
+              # Die Basis muss Trixie sein, unabhaengig vom Runner-Image.
+              grep -q "LB_DISTRIBUTION=\"trixie\"" "$T/config/bootstrap" \
+                || { echo "::error::auto/config setzt nicht Trixie"; exit 1; }
+              # Secure Boot muss wirklich aktiv sein, nicht nur uebergeben.
+              grep -rq "LB_UEFI_SECURE_BOOT=\"enable\"" "$T"/config/ \
+                || { echo "::error::Secure Boot nicht aktiviert"; exit 1; }
+              echo "auto/config OK: Trixie + Secure Boot"
+            '
 
       - name: Summary
         run: |
