@@ -201,8 +201,13 @@ jobs:
               chmod 0755 "$T/auto/config"
               ( cd "$T" && bash auto/config )
 
-              grep -hE "LB_DISTRIBUTION=|LB_UEFI_SECURE_BOOT|LB_IMAGE_TYPE|LB_BOOTLOADERS|LB_CHROOT_SQUASHFS_COMPRESSION_TYPE" \
-                "$T"/config/* | sort -u
+              # Nur regulaere Dateien lesen: config/ enthaelt auch
+              # Unterverzeichnisse, bei denen grep "Is a directory" meldet und
+              # mit Status 2 endet - unter "pipefail" bricht das den Job ab,
+              # obwohl lb config erfolgreich war.
+              { find "$T/config" -maxdepth 1 -type f -exec grep -hE \
+                  "LB_DISTRIBUTION=|LB_UEFI_SECURE_BOOT|LB_IMAGE_TYPE|LB_BOOTLOADERS|LB_CHROOT_SQUASHFS_COMPRESSION_TYPE" \
+                  {} + || true; } | sort -u
 
               # Die Basis muss Trixie sein, unabhaengig vom Runner-Image.
               grep -q "LB_DISTRIBUTION=\"trixie\"" "$T/config/bootstrap" \
