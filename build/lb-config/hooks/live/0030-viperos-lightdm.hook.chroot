@@ -1,0 +1,57 @@
+#!/bin/bash
+# ViperosOS - LightDM Login-Manager Konfiguration
+
+set -e
+
+echo "[ViperosOS] Konfiguriere LightDM..."
+
+# Verzeichnisse sicherstellen
+mkdir -p /etc/lightdm
+
+# LightDM Hauptkonfiguration
+cat > /etc/lightdm/lightdm.conf << 'EOF'
+[LightDM]
+run-directory=/run/lightdm
+
+[Seat:*]
+# Greeter
+greeter-session=lightdm-gtk-greeter
+# Standard-Session
+user-session=xfce
+# Autologin für Live-Session
+autologin-user=viperos
+autologin-user-timeout=0
+autologin-session=xfce
+pam-service=lightdm
+pam-autologin-service=lightdm-autologin
+# Kein Gast-Login
+allow-guest=false
+EOF
+
+# LightDM GTK Greeter Design
+cat > /etc/lightdm/lightdm-gtk-greeter.conf << 'EOF'
+[greeter]
+theme-name = Arc-Dark
+icon-theme-name = Papirus-Dark
+cursor-theme-name = breeze_cursors
+cursor-theme-size = 24
+background = /usr/share/viperos/wallpaper.jpg
+font-name = Noto Sans 11
+xft-antialias = true
+xft-dpi = 96
+xft-hintstyle = hintfull
+xft-rgba = rgb
+show-indicators = ~host;~spacer;~clock;~spacer;~language;~session;~a11y;~power
+show-clock = true
+clock-format = %H:%M  %d.%m.%Y
+panel-position = top
+user-background = false
+hide-user-image = false
+default-user-image = /usr/share/viperos/user-icon.png
+position = 50%,center 50%,center
+EOF
+
+# LightDM als Display-Manager aktivieren
+systemctl enable lightdm 2>/dev/null || true
+
+echo "[ViperosOS] LightDM konfiguriert."

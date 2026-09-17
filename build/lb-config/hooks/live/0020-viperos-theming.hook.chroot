@@ -1,0 +1,185 @@
+#!/bin/bash
+# ViperosOS - Theme & Desktop Setup (Modern Linux Topbar + Dark Glass + Classic Window Buttons)
+
+set -e
+
+echo "[ViperosOS] Konfiguriere Modern-Linux Dark-Glass Desktop Theme..."
+
+# XFCE4 Konfiguration für Live-User und Skel
+for USER_DIR in /home/viperos /etc/skel; do
+    mkdir -p "${USER_DIR}/.config/xfce4/xfconf/xfce-perchannel-xml"
+    mkdir -p "${USER_DIR}/.config/xfce4/panel"
+    mkdir -p "${USER_DIR}/.config/autostart"
+
+    # 1. XFCE4 Desktop Einstellungen
+    cat > "${USER_DIR}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml" << 'XFCEEOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfce4-desktop" version="1.0">
+  <property name="backdrop" type="empty">
+    <property name="screen0" type="empty">
+      <property name="monitorHDMI-1" type="empty">
+        <property name="workspace0" type="empty">
+          <property name="color-style" type="int" value="0"/>
+          <property name="image-style" type="int" value="5"/>
+          <property name="image-path" type="string" value="/usr/share/viperos/wallpaper.png"/>
+        </property>
+      </property>
+      <property name="monitor0" type="empty">
+        <property name="workspace0" type="empty">
+          <property name="color-style" type="int" value="0"/>
+          <property name="image-style" type="int" value="5"/>
+          <property name="image-path" type="string" value="/usr/share/viperos/wallpaper.png"/>
+        </property>
+      </property>
+    </property>
+  </property>
+  <property name="desktop-icons" type="empty">
+    <property name="style" type="int" value="2"/>
+    <property name="show-home" type="bool" value="true"/>
+    <property name="show-trash" type="bool" value="true"/>
+    <property name="show-filesystem" type="bool" value="false"/>
+    <property name="show-removable" type="bool" value="true"/>
+    <property name="icon-size" type="uint" value="48"/>
+  </property>
+</channel>
+XFCEEOF
+
+    # 2. XFWM4 Fenstermanager Theme (Klassische Fensterknöpfe - X oben rechts)
+    cat > "${USER_DIR}/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml" << 'XFWMEOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfwm4" version="1.0">
+  <property name="general" type="empty">
+    <property name="theme" type="string" value="Arc-Dark"/>
+    <property name="title_font" type="string" value="Noto Sans Bold 10"/>
+    <property name="title_alignment" type="string" value="left"/>
+    <property name="button_layout" type="string" value="O|HMC"/>
+    <property name="box_resize" type="bool" value="false"/>
+    <property name="use_compositing" type="bool" value="true"/>
+    <property name="frame_opacity" type="int" value="95"/>
+    <property name="inactive_opacity" type="int" value="85"/>
+  </property>
+</channel>
+XFWMEOF
+
+    # 3. GTK Theme & Icon Theme (macOS Dark Aesthetics + Papirus Icons)
+    cat > "${USER_DIR}/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml" << 'XSETEOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xsettings" version="1.0">
+  <property name="Net" type="empty">
+    <property name="ThemeName" type="string" value="Arc-Dark"/>
+    <property name="IconThemeName" type="string" value="Papirus-Dark"/>
+    <property name="CursorThemeName" type="string" value="breeze_cursors"/>
+  </property>
+  <property name="Gtk" type="empty">
+    <property name="FontName" type="string" value="Noto Sans 10"/>
+    <property name="MonospaceFontName" type="string" value="Noto Sans Mono 10"/>
+    <property name="CursorThemeSize" type="int" value="24"/>
+    <property name="DecorationLayout" type="string" value="menu:minimize,maximize,close"/>
+  </property>
+</channel>
+XSETEOF
+
+    # 4. Modern Linux Topbar (Transparente XFCE-Panel Leiste oben + Whisker App-Menü & Taskleiste)
+    cat > "${USER_DIR}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml" << 'PANELEOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfce4-panel" version="1.0">
+  <property name="configver" type="int" value="2"/>
+  <property name="panels" type="array">
+    <value type="int" value="1"/>
+  </property>
+  <property name="panel-1" type="empty">
+    <property name="position" type="string" value="p=6;x=0;y=0"/>
+    <property name="length" type="double" value="100"/>
+    <property name="length-type" type="uint" value="0"/>
+    <property name="position-locked" type="bool" value="true"/>
+    <property name="size" type="uint" value="34"/>
+    <property name="background-style" type="uint" value="1"/>
+    <property name="background-rgba" type="array">
+      <value type="double" value="0.06"/>
+      <value type="double" value="0.09"/>
+      <value type="double" value="0.16"/>
+      <value type="double" value="0.85"/>
+    </property>
+    <property name="plugin-ids" type="array">
+      <value type="int" value="1"/>
+      <value type="int" value="2"/>
+      <value type="int" value="3"/>
+      <value type="int" value="4"/>
+      <value type="int" value="5"/>
+      <value type="int" value="6"/>
+      <value type="int" value="7"/>
+      <value type="int" value="8"/>
+      <value type="int" value="9"/>
+    </property>
+  </property>
+  <property name="plugins" type="empty">
+    <property name="plugin-1" type="string" value="whiskermenu"/>
+    <property name="plugin-2" type="string" value="separator"/>
+    <property name="plugin-3" type="string" value="tasklist"/>
+    <property name="plugin-4" type="string" value="separator"/>
+    <property name="plugin-5" type="string" value="systray"/>
+    <property name="plugin-6" type="string" value="pulseaudio"/>
+    <property name="plugin-7" type="string" value="power-manager-plugin"/>
+    <property name="plugin-8" type="string" value="clock"/>
+    <property name="plugin-9" type="string" value="actions"/>
+  </property>
+</channel>
+PANELEOF
+
+    # 5. Whisker-Menu Konfiguration
+    cat > "${USER_DIR}/.config/xfce4/panel/whiskermenu-1.rc" << 'WHISKEREOF'
+button-title=ViperOS
+button-icon=/usr/share/viperos/user-icon.png
+button-single-row=true
+show-button-title=true
+show-button-icon=true
+category-icon-size=1
+item-icon-size=2
+hover-switch-category=true
+WHISKEREOF
+
+    # 6. Keyboard Shortcuts (Windows-Taste -> Whisker Menu / App-Suche, Super+Space, Ctrl+Alt+T)
+    cat > "${USER_DIR}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-keyboard-shortcuts.xml" << 'KEYEOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<channel name="xfce4-keyboard-shortcuts" version="1.0">
+  <property name="commands" type="empty">
+    <property name="custom" type="empty">
+      <property name="&lt;Super&gt;" type="string" value="xfce4-popup-whiskermenu"/>
+      <property name="Super_L" type="string" value="xfce4-popup-whiskermenu"/>
+      <property name="&lt;Super&gt;space" type="string" value="xfce4-appfinder"/>
+      <property name="&lt;Control&gt;&lt;Alt&gt;t" type="string" value="xfce4-terminal"/>
+      <property name="&lt;Super&gt;e" type="string" value="thunar"/>
+      <property name="&lt;Super&gt;t" type="string" value="xfce4-terminal"/>
+    </property>
+  </property>
+</channel>
+KEYEOF
+
+    # 6. Terminal Tuning (.bashrc Aliases & Fastfetch)
+    cat >> "${USER_DIR}/.bashrc" << 'BASHCEOF'
+
+# ViperOS Terminal Prompt & Aliases
+export PS1='\[\033[01;32m\]viperos@viperos\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
+
+alias ll='ls -alF --color=auto'
+alias la='ls -A --color=auto'
+alias l='ls -CF --color=auto'
+alias update='sudo apt update && sudo apt upgrade -y'
+alias install='sudo apt install -y'
+alias cls='clear'
+
+if command -v fastfetch >/dev/null 2>&1; then
+    fastfetch
+fi
+BASHCEOF
+
+    if [ -d "${USER_DIR}" ]; then
+        chown -R viperos:viperos "${USER_DIR}" 2>/dev/null || true
+    fi
+done
+
+echo "[ViperosOS] Desktop-Theme & Topbar erfolgreich konfiguriert."
+
+# System-weites Fallback Panel für XFCE
+mkdir -p /etc/xdg/xfce4/panel
+cp /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml /etc/xdg/xfce4/panel/default.xml 2>/dev/null || true

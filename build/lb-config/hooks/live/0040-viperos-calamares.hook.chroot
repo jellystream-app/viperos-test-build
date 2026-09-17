@@ -1,0 +1,59 @@
+#!/bin/bash
+set -e
+
+brand_root=/usr/share/calamares/branding
+mkdir -p "$brand_root/viperos"
+
+if [ -d "$brand_root/debian" ]; then
+    cp -a "$brand_root/debian/." "$brand_root/viperos/"
+fi
+
+python3 - << 'PYEOF'
+from PIL import Image, ImageDraw
+for name in ("viperos-icon.png", "viperos-logo.png"):
+    image = Image.new("RGB", (192, 192), (16, 24, 39))
+    draw = ImageDraw.Draw(image)
+    draw.rounded_rectangle((22, 22, 170, 170), radius=28, outline=(85, 165, 247), width=8)
+    draw.line((62, 68, 96, 132, 134, 68), fill=(231, 238, 249), width=10, joint="curve")
+    image.save("/usr/share/calamares/branding/viperos/" + name)
+PYEOF
+cat > "$brand_root/viperos/branding.desc" << 'EOF'
+---
+componentName: viperos
+welcomeStyleCalamares: true
+welcomeExpandingLogo: true
+strings:
+    productName: ViperOS
+    shortProductName: ViperOS
+    version: 1.0
+    shortVersion: 1.0
+    versionedName: ViperOS 1.0
+    shortVersionedName: ViperOS 1.0
+    bootloaderEntryName: ViperOS
+    productUrl: https://viperos.os/
+    supportUrl: https://viperos.os/support/
+    releaseNotesUrl: https://viperos.os/release-notes/
+images:
+    productLogo: viperos-logo.png
+    productIcon: viperos-icon.png
+colors:
+    sidebarBackground: "#101827"
+    sidebarText: "#e7eef9"
+    sidebarTextSelect: "#ffffff"
+    sidebarTextHighlight: "#55a5f7"
+EOF
+
+if [ -f /etc/calamares/settings.conf ]; then
+    sed -i 's/^branding: .*/branding: viperos/' /etc/calamares/settings.conf
+fi
+
+cat > /usr/share/applications/viperos-installer.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=Install ViperOS
+Comment=Install ViperOS on this computer
+Exec=pkexec calamares
+Icon=viperos
+Terminal=false
+Categories=System;
+EOF

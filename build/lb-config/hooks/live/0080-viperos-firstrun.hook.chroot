@@ -1,0 +1,35 @@
+#!/bin/bash
+set -e
+
+mkdir -p /etc/xdg/autostart /etc/skel/.config/autostart
+cat > /usr/local/bin/viperos-first-run << 'EOF'
+#!/bin/sh
+set -eu
+state_file="$HOME/.config/viperos/first-run-complete"
+[ -e "$state_file" ] && exit 0
+mkdir -p "$(dirname "$state_file")"
+viperos-hub
+touch "$state_file"
+EOF
+chmod 0755 /usr/local/bin/viperos-first-run
+
+cat > /etc/xdg/autostart/viperos-first-run.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=ViperOS Hub
+Exec=/usr/local/bin/viperos-first-run
+Icon=viperos
+Terminal=false
+OnlyShowIn=XFCE;
+X-GNOME-Autostart-enabled=true
+EOF
+
+cat > /etc/xdg/autostart/nm-applet.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=Network
+Exec=nm-applet --sm-disable
+Icon=network-wireless
+Terminal=false
+X-GNOME-Autostart-enabled=true
+EOF

@@ -1,0 +1,25 @@
+#!/bin/bash
+set -e
+
+cat > /etc/apt/apt.conf.d/20auto-upgrades << 'EOF'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+EOF
+
+sed -i 's/^DEFAULT_INPUT_POLICY=.*/DEFAULT_INPUT_POLICY="DROP"/' /etc/default/ufw
+sed -i 's/^DEFAULT_OUTPUT_POLICY=.*/DEFAULT_OUTPUT_POLICY="ACCEPT"/' /etc/default/ufw
+sed -i 's/^ENABLED=.*/ENABLED=yes/' /etc/ufw/ufw.conf
+
+mkdir -p /etc/systemd/system/lightdm.service.d /usr/local/lib/viperos
+cat > /usr/local/lib/viperos/prepare-lightdm << 'EOF'
+#!/bin/sh
+if ! id viperos >/dev/null 2>&1; then
+    sed -i '/^autologin-user=/d;/^autologin-user-timeout=/d;/^autologin-session=/d' /etc/lightdm/lightdm.conf
+    rm -f /etc/sudoers.d/viperos-live
+fi
+EOF
+chmod 0755 /usr/local/lib/viperos/prepare-lightdm
+cat > /etc/systemd/system/lightdm.service.d/viperos.conf << 'EOF'
+[Service]
+ExecStartPre=/usr/local/lib/viperos/prepare-lightdm
+EOF

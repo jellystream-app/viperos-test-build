@@ -1,0 +1,102 @@
+#!/bin/bash
+# ViperosOS - Branding, Wallpaper, Logos
+
+set -e
+
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+echo "[ViperosOS] Erstelle Branding-Assets..."
+
+mkdir -p /usr/share/viperos
+
+# --------------------------------------------------------
+# HD Dark Glass Wallpaper via Python PIL/ImageMagick
+# --------------------------------------------------------
+python3 -c "
+import math
+try:
+    from PIL import Image, ImageDraw
+    img = Image.new('RGB', (1920, 1080), (10, 15, 26))
+    draw = ImageDraw.Draw(img)
+    # Radial dark blue / glass gradient
+    for y in range(1080):
+        r = int(10 + (22 - 10) * (y / 1080))
+        g = int(15 + (45 - 15) * (y / 1080))
+        b = int(26 + (75 - 26) * (y / 1080))
+        draw.line([(0, y), (1920, y)], fill=(r, g, b))
+    # Accent geometric lines
+    draw.polygon([(0, 1080), (1920, 700), (1920, 1080)], fill=(16, 28, 50))
+    draw.polygon([(0, 1080), (1200, 1080), (0, 400)], fill=(14, 38, 70))
+    img.save('/usr/share/viperos/wallpaper.png')
+    
+    # User Icon
+    icon = Image.new('RGB', (96, 96), (0, 132, 255))
+    idraw = ImageDraw.Draw(icon)
+    idraw.rectangle([8, 8, 88, 88], outline=(255, 255, 255), width=3)
+    icon.save('/usr/share/viperos/user-icon.png')
+    icon.save('/usr/share/pixmaps/viperos.png')
+    icon.save('/usr/share/calamares/branding/viperos/viperos-icon.png')
+    icon.save('/usr/share/calamares/branding/viperos/viperos-logo.png')
+    print('HD Wallpaper via Python PIL erstellt.')
+except Exception as e:
+    print('Fallback minimal wallpaper:', e)
+    with open('/usr/share/viperos/wallpaper.png', 'wb') as f:
+        f.write(b'')
+" 2>/dev/null || true
+
+# Symlink für Fallback
+ln -sf /usr/share/viperos/wallpaper.png /usr/share/viperos/wallpaper.jpg 2>/dev/null || true
+
+# --------------------------------------------------------
+# OS-Release Informationen
+# --------------------------------------------------------
+cat > /etc/os-release << 'EOF'
+PRETTY_NAME="ViperosOS 1.0 (Trixie)"
+NAME="ViperosOS"
+VERSION_ID="1.0"
+VERSION="1.0 (Viper)"
+VERSION_CODENAME=viper
+ID=viperos
+ID_LIKE=debian
+HOME_URL="https://viperos.os/"
+SUPPORT_URL="https://viperos.os/support/"
+BUG_REPORT_URL="https://viperos.os/bugs/"
+LOGO=viperos-logo
+EOF
+
+# --------------------------------------------------------
+# Issue & Motd
+# --------------------------------------------------------
+cat > /etc/issue << 'EOF'
+
+  ViperosOS 1.0 - Based on Debian 13 (Trixie)
+  \l
+
+EOF
+
+cp /etc/issue /etc/issue.net
+
+cat > /etc/motd << 'EOF'
+
+  Willkommen bei ViperosOS 1.0!
+
+  Live-Benutzer: viperos  |  Passwort: viperos
+
+EOF
+
+# --------------------------------------------------------
+# GRUB Bootmenü Design
+# --------------------------------------------------------
+mkdir -p /boot/grub/themes/viperos
+cat > /etc/default/grub << 'EOF'
+GRUB_DEFAULT=0
+GRUB_TIMEOUT=5
+GRUB_DISTRIBUTOR="ViperOS"
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
+GRUB_CMDLINE_LINUX=""
+GRUB_BACKGROUND="/usr/share/viperos/wallpaper.png"
+GRUB_GFXMODE="1920x1080,1280x720,auto"
+GRUB_GFXPAYLOAD_LINUX=keep
+EOF
+
+echo "[ViperosOS] Branding erstellt."

@@ -1,0 +1,64 @@
+#!/bin/bash
+# ViperosOS - Cleanup & Abschluss-Konfigurationen
+
+set -e
+
+echo "[ViperosOS] Finale Konfiguration & Cleanup..."
+
+# APT Cache leeren
+apt-get clean
+rm -rf /var/lib/apt/lists/*
+rm -rf /tmp/*
+rm -rf /var/tmp/*
+
+# Locale generieren
+locale-gen de_DE.UTF-8 en_US.UTF-8 2>/dev/null || true
+update-locale LANG=de_DE.UTF-8 LC_ALL=de_DE.UTF-8 2>/dev/null || true
+
+# Zeitzone
+ln -sf /usr/share/zoneinfo/Europe/Berlin /etc/localtime 2>/dev/null || true
+echo "Europe/Berlin" > /etc/timezone
+
+# Keyboard Layout
+cat > /etc/default/keyboard << 'EOF'
+XKBMODEL="pc105"
+XKBLAYOUT="de"
+XKBVARIANT=""
+XKBOPTIONS=""
+BACKSPACE="guess"
+EOF
+
+# Desktop-Shortcuts für Live-User
+mkdir -p /home/viperos/Desktop
+cp /etc/skel/Desktop/* /home/viperos/Desktop/ 2>/dev/null || true
+chown -R viperos:viperos /home/viperos/ 2>/dev/null || true
+
+# Systemd-Targets optimieren für schnelleren Boot
+systemctl set-default graphical.target 2>/dev/null || true
+systemctl disable plymouth 2>/dev/null || true
+systemctl enable NetworkManager 2>/dev/null || true
+systemctl enable lightdm 2>/dev/null || true
+systemctl enable bluetooth 2>/dev/null || true
+
+# PipeWire als Audio-Stack aktivieren (User-Units, greifen pro Session).
+# In Trixie ersetzt pipewire-pulse den PulseAudio-Daemon; die Units muessen
+# fuer neue Benutzer per systemctl --global aktiviert sein.
+systemctl --global enable pipewire.socket 2>/dev/null || true
+systemctl --global enable pipewire-pulse.socket 2>/dev/null || true
+systemctl --global enable wireplumber.service 2>/dev/null || true
+
+# Sprachpakete für Firefox
+update-locale 2>/dev/null || true
+
+# Zenity sicherstellen (für Welcome-Wizard)
+which zenity || apt-get install -y zenity 2>/dev/null || true
+
+echo "[ViperosOS] Finale Konfiguration abgeschlossen."
+echo ""
+echo "  ✓ ViperosOS 1.0 Build-Konfiguration komplett"
+echo "  ✓ Live-User: viperos / viperos"
+echo "  ✓ Desktop: XFCE4 mit Arc-Dark Theme"
+echo "  ✓ Browser: Firefox ESR"
+echo "  ✓ Netzwerk: NetworkManager"
+echo "  ✓ Login: LightDM (Autologin im Live-Mode)"
+echo "  ✓ Installer: Calamares"

@@ -1,0 +1,34 @@
+#!/bin/bash
+# ViperosOS - Live-User Setup
+# Erstellt den viperos Live-User (kein Passwort, autologin)
+
+set -e
+
+echo "[ViperosOS] Richte Live-User ein..."
+
+# Live-User anlegen falls nicht vorhanden
+if ! id -u viperos &>/dev/null; then
+    # Sicherstellen dass alle Gruppen existieren, bevor User angelegt wird
+    for grp in sudo audio video plugdev netdev bluetooth autologin nopasswdlogin; do
+        getent group "$grp" &>/dev/null || groupadd -r "$grp"
+    done
+    useradd -m -s /bin/bash -G sudo,audio,video,plugdev,netdev,bluetooth,autologin,nopasswdlogin viperos
+    echo "viperos:viperos" | chpasswd
+fi
+
+# Sudo ohne Passwort für Live-Session
+mkdir -p /etc/sudoers.d
+echo "viperos ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/viperos-live
+chmod 0440 /etc/sudoers.d/viperos-live
+
+# Hostname setzen
+echo "viperos" > /etc/hostname
+cat > /etc/hosts << 'EOF'
+127.0.0.1   localhost
+127.0.1.1   viperos
+::1         localhost ip6-localhost ip6-loopback
+ff02::1     ip6-allnodes
+ff02::2     ip6-allrouters
+EOF
+
+echo "[ViperosOS] Live-User 'viperos' wurde eingerichtet."

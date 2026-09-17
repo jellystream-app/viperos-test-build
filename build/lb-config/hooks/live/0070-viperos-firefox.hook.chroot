@@ -1,0 +1,92 @@
+#!/bin/bash
+# ViperosOS - Firefox Konfiguration & Startseite
+
+set -e
+
+echo "[ViperosOS] Konfiguriere Firefox..."
+
+# Firefox-Profil Verzeichnis
+FIREFOX_POLICIES="/etc/firefox/policies"
+mkdir -p "${FIREFOX_POLICIES}"
+
+# Firefox Policies (Startseite, Lesezeichen, etc.)
+cat > "${FIREFOX_POLICIES}/policies.json" << 'EOF'
+{
+    "policies": {
+        "Homepage": {
+            "URL": "about:home",
+            "Locked": false,
+            "StartPage": "previous-session"
+        },
+        "NewTabPage": true,
+        "DisplayMenuBar": "default-on",
+        "DisableAppUpdate": false,
+        "DisableTelemetry": true,
+        "DisableFirefoxStudies": true,
+        "DisablePocket": true,
+        "OverrideFirstRunPage": "about:home",
+        "OverridePostUpdatePage": "",
+        "Bookmarks": [
+            {
+                "Title": "ViperosOS - Startseite",
+                "URL": "https://viperos.os/",
+                "Favicon": "https://viperos.os/favicon.ico",
+                "Placement": "toolbar",
+                "Folder": "ViperosOS"
+            }
+        ],
+        "SearchEngines": {
+            "Default": "DuckDuckGo"
+        },
+        "Extensions": {
+            "Install": []
+        },
+        "Preferences": {
+            "browser.startup.homepage": "about:home",
+            "browser.newtabpage.enabled": true,
+            "browser.toolbars.bookmarks.visibility": "always",
+            "media.peerconnection.enabled": true,
+            "privacy.trackingprotection.enabled": true
+        }
+    }
+}
+EOF
+
+# Firefox als Standardbrowser setzen
+update-alternatives --set x-www-browser /usr/bin/firefox-esr 2>/dev/null || true
+update-alternatives --set gnome-www-browser /usr/bin/firefox-esr 2>/dev/null || true
+
+# Desktop-Eintrag sicherstellen
+cat > /usr/share/applications/firefox-esr.desktop << 'EOF'
+[Desktop Entry]
+Version=1.0
+Name=ViperOS Browser
+Name[de]=ViperOS Browser
+GenericName=ViperOS Web Browser
+GenericName[de]=ViperOS Webbrowser
+Comment=Surf the Web
+Comment[de]=Im Internet surfen
+Exec=firefox-esr %u
+Terminal=false
+X-MultipleArgs=false
+Type=Application
+Icon=firefox-esr
+Categories=Network;WebBrowser;
+MimeType=text/html;text/xml;application/xhtml+xml;application/xml;application/rss+xml;application/rdf+xml;image/gif;image/jpeg;image/png;x-scheme-handler/http;x-scheme-handler/https;x-scheme-handler/ftp;
+StartupNotify=true
+StartupWMClass=Firefox
+EOF
+
+# MIME-Handler setzen
+mkdir -p /etc/skel/.config
+cat > /etc/skel/.config/mimeapps.list << 'EOF'
+[Default Applications]
+text/html=firefox-esr.desktop
+x-scheme-handler/http=firefox-esr.desktop
+x-scheme-handler/https=firefox-esr.desktop
+x-scheme-handler/ftp=firefox-esr.desktop
+application/xhtml+xml=firefox-esr.desktop
+application/xml=firefox-esr.desktop
+EOF
+
+echo "[ViperosOS] Firefox konfiguriert."

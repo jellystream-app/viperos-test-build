@@ -1,0 +1,160 @@
+# ============================================================
+# ViperosOS - Paketliste (Debian 13 Trixie)
+# Desktop: XFCE4 | Theme: Dark Glass | Apps: Dev + Media + Office
+# ============================================================
+
+# --- Basissystem & Sudo ---
+sudo
+bash-completion
+curl
+wget
+ca-certificates
+# gnupg2 war ein Transitional-Paket (Section: oldlibs) -> gnupg
+gnupg
+openssl
+# apt-transport-https entfaellt: seit apt 1.5 im Kern enthalten
+dbus-x11
+# policykit-1 war transitional -> polkitd + pkexec
+polkitd
+pkexec
+
+# --- Live-Boot (CRITICAL) ---
+live-boot
+live-config
+live-config-systemd
+live-tools
+user-setup
+
+# --- Hardware-Firmware ---
+firmware-linux
+firmware-linux-nonfree
+firmware-amd-graphics
+firmware-iwlwifi
+firmware-realtek
+firmware-atheros
+firmware-misc-nonfree
+firmware-sof-signed
+intel-microcode
+amd64-microcode
+
+# --- Secure Boot (ISO startet auch mit aktiviertem Secure Boot) ---
+shim-signed
+grub-efi-amd64-signed
+
+# --- Display & XFCE4 Desktop ---
+xorg
+xserver-xorg
+xserver-xorg-input-all
+xinit
+xfce4
+xfce4-goodies
+xfce4-terminal
+xfce4-power-manager
+xfce4-notifyd
+xfce4-appfinder
+xfce4-whiskermenu-plugin
+xfce4-clipman-plugin
+xfce4-pulseaudio-plugin
+xfce4-systemload-plugin
+xfce4-netload-plugin
+xfwm4
+xfdesktop4
+thunar
+thunar-archive-plugin
+thunar-volman
+mousepad
+ristretto
+parole
+
+# --- Login Manager ---
+lightdm
+lightdm-gtk-greeter
+lightdm-gtk-greeter-settings
+
+# --- Browsers ---
+firefox-esr
+
+# --- Software & Developer Tools ---
+nodejs
+npm
+git
+python3
+python3-pip
+python3-venv
+python3-pil
+python3-gi
+gir1.2-gtk-3.0
+
+# --- Media & Design ---
+vlc
+gimp
+flameshot
+inkscape
+audacity
+obs-studio
+
+# --- Office & Utilities ---
+libreoffice-gtk3
+libreoffice-calc
+libreoffice-writer
+libreoffice-impress
+libreoffice-l10n-de
+
+# --- Package Management ---
+flatpak
+xdg-desktop-portal-gtk
+
+# --- Netzwerk ---
+network-manager
+network-manager-gnome
+network-manager-openvpn
+network-manager-openvpn-gnome
+wireless-tools
+wpasupplicant
+rfkill
+net-tools
+iputils-ping
+openssh-client
+remmina
+filezilla
+
+# --- Bluetooth ---
+bluez
+blueman
+
+# --- Audio (PipeWire ist der Standard-Stack in Trixie) ---
+pipewire
+pipewire-pulse
+pipewire-alsa
+wireplumber
+pavucontrol
+alsa-utils
+
+# --- Security ---
+apparmor
+apparmor-utils
+unattended-upgrades
+ufw
+
+# --- Fonts & Theming ---
+fonts-dejavu
+fonts-liberation
+fonts-noto
+fonts-noto-color-emoji
+gtk2-engines-murrine
+arc-theme
+papirus-icon-theme
+
+# --- Systemtools ---
+gparted
+htop
+# neofetch existiert in Trixie nicht mehr (upstream unmaintained) -> fastfetch
+fastfetch
+keepassxc
+file-roller
+zip
+unzip
+p7zip-full
+zenity
+calamares
+calamares-settings-debian

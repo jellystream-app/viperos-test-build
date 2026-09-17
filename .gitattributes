@@ -1,0 +1,55 @@
+# Everything that is executed or parsed inside WSL/Linux MUST keep LF.
+# A single CR turns "ca-certificates" into "ca-certificates\r", which apt
+# reports as "E: Unable to locate package ca-certificates" - only ever on the
+# LAST name of a line, which makes it look like that one package is broken.
+
+* text=auto eol=lf
+
+# Shell scripts and live-build hooks run in the chroot
+*.sh            text eol=lf
+*.bash          text eol=lf
+*.hook.chroot   text eol=lf
+*.hook.binary   text eol=lf
+*.chroot        text eol=lf
+*.binary        text eol=lf
+
+# live-build reads these line by line as package names
+*.list          text eol=lf
+*.list.chroot   text eol=lf
+*.list.binary   text eol=lf
+*.packages      text eol=lf
+
+# live-build auto scripts (no extension)
+build/lb-config/auto/config  text eol=lf
+build/lb-config/auto/build   text eol=lf
+build/lb-config/auto/clean   text eol=lf
+
+# Config files shipped into the image
+*.conf          text eol=lf
+*.desc          text eol=lf
+*.json          text eol=lf
+*.yaml          text eol=lf
+*.yml           text eol=lf
+*.desktop       text eol=lf
+os-release      text eol=lf
+
+# Windows-side launchers keep CRLF (cmd.exe needs it)
+*.bat           text eol=crlf
+*.cmd           text eol=crlf
+
+# PowerShell: LF is safe and avoids CR leaking into here-strings that are
+# piped into bash. This is the root cause of the original build failure.
+*.ps1           text eol=lf
+
+# Binary assets must never be touched
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.ico           binary
+*.gz            binary
+*.xz            binary
+*.zst           binary
+*.deb           binary
+*.iso           binary
+*.squashfs      binary
+*.bin           binary

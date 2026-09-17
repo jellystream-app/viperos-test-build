@@ -1,0 +1,438 @@
+name: Build ViperOS ISO
+
+# Der Build laeuft auf GitHub-Runnern, nicht auf dem eigenen PC.
+# Runner-Fakten, gegen die dieser Workflow ausgelegt ist (public repo):
+#   4 vCPU, 16 GB RAM, 14 GB SSD, max. 6 h Job-Laufzeit.
+# Gemessener Platzbedarf des Builds: ~9 GB Spitze (chroot 3.6 GB unpacked,
+# 0.87 GB apt-Cache, squashfs ~1.5 GB, ISO ~1.8 GB). Das passt nur, wenn
+# vorher das vorinstallierte Runner-Image aufgeraeumt wird - siehe "Free disk".
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'build/**'
+      - 'scripts/build-iso.sh'
+      - '.github/workflows/build-iso.yml'
+  pull_request:
+    paths:
+      - 'build/**'
+      - '.github/workflows/build-iso.yml'
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'ISO als GitHub-Release veroeffentlichen'
+        type: boolean
+        default: false
+      version:
+        description: 'Versions-Tag (z. B. 1.0). Leer = Lauf-Nummer'
+        type: string
+        default: ''
+
+concurrency:
+  group: iso-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Stufe 1: Preflight. Scheitert in ~2 Minuten statt nach 40 Minuten Build.
+  # Prueft die Paketliste gegen Trixie, die Hook-Syntax und alle externen Hosts.
+  # ---------------------------------------------------------------------------
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install validation tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            debian-archive-keyring live-build curl ca-certificates
+
+      - name: CRLF check
+        run: |
+          # Ein einzelnes CR macht aus "ca-certificates" ein
+          # "ca-certificates\r" -> apt meldet "Unable to locate package".
+          # Nur das LETZTE Wort einer Zeile ist betroffen, daher sieht es so
+          # aus, als waere genau dieses eine Paket kaputt.
+          bad=0
+          while IFS= read -r f; do
+            if awk '/\r/{found=1} END{exit !found}' "$f"; then
+              echo "::error file=$f::CRLF-Zeilenenden - muessen LF sein"
+              bad=1
+            fi
+          done < <(find build/lb-config -type f \
+                     \( -name '*.hook.chroot' -o -name '*.list.chroot' \
+                        -o -name 'config' -o -name 'build' -o -name 'clean' \))
+          [ "$bad" -eq 0 ] && echo "Alle Dateien haben LF-Zeilenenden."
+          exit "$bad"
+
+      - name: Hook syntax check
+        run: |
+          # Ein unterminiertes Here-Doc erzeugt nur eine WARNUNG mit rc=0,
+          # deshalb wird auch die Ausgabe geprueft, nicht nur der Exit-Code.
+          bad=0
+          for h in build/lb-config/hooks/live/*.hook.chroot; do
+            [ -f "$h" ] || continue
+            out=$(bash -n "$h" 2>&1); rc=$?
+            if [ "$rc" -ne 0 ]; then
+              echo "::error file=$h::Syntaxfehler: $out"; bad=1
+            elif [ -n "$out" ]; then
+              echo "::error file=$h::Shell-Warnung: $out"; bad=1
+            else
+              echo "  OK  $h"
+            fi
+          done
+          exit "$bad"
+
+      - name: Validate package list against Debian Trixie
+        run: |
+          # Gegen die ZIELdistribution pruefen, nicht gegen den Ubuntu-Runner.
+          ROOT=$(mktemp -d)
+          mkdir -p "$ROOT"/etc/apt/trusted.gpg.d "$ROOT"/var/lib/apt/lists/partial \
+                   "$ROOT"/var/cache/apt/archives/partial "$ROOT"/var/lib/dpkg
+          : > "$ROOT/var/lib/dpkg/status"
+          cp /usr/share/keyrings/debian-archive-keyring.gpg "$ROOT/etc/apt/trusted.gpg.d/"
+          # Kein eingeruecktes Here-Doc: die YAML-Einrueckung landet sonst mit
+          # in der Datei und apt ignoriert die Zeilen.
+          {
+            echo 'deb https://deb.debian.org/debian trixie main contrib non-free non-free-firmware'
+            echo 'deb https://deb.debian.org/debian trixie-updates main contrib non-free non-free-firmware'
+            echo 'deb https://security.debian.org/debian-security trixie-security main contrib non-free non-free-firmware'
+          } > "$ROOT/etc/apt/sources.list"
+
+          APTO="-o Dir=$ROOT -o Dir::State=$ROOT/var/lib/apt
+                -o Dir::State::status=$ROOT/var/lib/dpkg/status
+                -o Dir::Cache=$ROOT/var/cache/apt
+                -o Dir::Etc::sourcelist=$ROOT/etc/apt/sources.list
+                -o Dir::Etc::sourceparts=$ROOT/etc/apt/sources.list.d
+                -o Dir::Etc::trustedparts=$ROOT/etc/apt/trusted.gpg.d
+                -o APT::Architecture=amd64 -o Acquire::Languages=none"
+
+          apt-get $APTO update
+          # Sanity-Gate: ohne geladenen Index wuerde JEDES Paket als fehlend
+          # gemeldet werden - das Ergebnis waere wertlos.
+          apt-cache $APTO show bash >/dev/null || {
+            echo "::error::Trixie-Index leer, Pruefung nicht aussagekraeftig"; exit 1; }
+
+          LIST=build/lb-config/package-lists/viperos-desktop.list.chroot
+          missing=''
+          while IFS= read -r line || [ -n "$line" ]; do
+            p=$(printf '%s' "${line%%#*}" | tr -d '[:space:]')
+            [ -z "$p" ] && continue
+            apt-cache $APTO show "$p" >/dev/null 2>&1 || missing="$missing $p"
+          done < "$LIST"
+          if [ -n "$missing" ]; then
+            echo "::error::Pakete fehlen in Trixie:$missing"; exit 1
+          fi
+
+          # Einzeln vorhanden reicht nicht - der Satz muss zusammen aufloesen.
+          pkgs=$(sed 's/#.*//' "$LIST" | tr -d '[:blank:]' | grep -v '^$' | tr '\n' ' ')
+          if ! apt-get $APTO install -y --dry-run --no-install-recommends $pkgs > /tmp/dry.txt 2>&1; then
+            echo "::error::Paketsatz loest in Trixie nicht auf"
+            grep -iE 'unmet|broken|conflict|^E:' /tmp/dry.txt | head -20
+            exit 1
+          fi
+          n=$(grep -c '^Inst ' /tmp/dry.txt)
+          echo "Paketliste OK - loest zu $n Paketen auf."
+          echo "PKG_COUNT=$n" >> "$GITHUB_ENV"
+
+      - name: Verify external build dependencies
+        run: |
+          # Diese Hosts braucht Hook 0015 waehrend des Builds. Sind sie nicht
+          # erreichbar, bricht der Build unter "set -e" mitten im Chroot ab.
+          bad=0
+          for url in \
+            https://deb.debian.org/debian/dists/trixie/InRelease \
+            https://security.debian.org/debian-security/dists/trixie-security/InRelease \
+            https://packages.microsoft.com/keys/microsoft.asc \
+            https://packages.microsoft.com/repos/code/dists/stable/InRelease \
+            https://dl.flathub.org/repo/flathub.flatpakrepo ; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "$url" || echo 000)
+            echo "  HTTP $code  $url"
+            [ "$code" = "200" ] || { echo "::error::$url nicht erreichbar (HTTP $code)"; bad=1; }
+          done
+          exit "$bad"
+
+      - name: Verify pinned Jellystream checksum
+        run: |
+          # Hook 0015 vergleicht diese SHA-512 mit "cmp" unter "set -e".
+          # Stimmt sie nicht, stirbt der Build nach ~40 Minuten. Also vorher.
+          V=2.14.0
+          DEB="Jellystream-${V}-amd64.deb"
+          curl -fL --retry 3 --proto '=https' --max-time 600 -o "/tmp/$DEB" \
+            "https://github.com/jellystream-app/jellystream/releases/download/v${V}/${DEB}"
+          printf '%s' 'LVQSTLE5sdx7aQvq3x7r2joNG95P459dvRDp9XwWtgtZzyLK7hpm7QUxktdLj2kOacM6Z3ki3sJpjuHZFsx9zw==' \
+            | base64 -d > /tmp/expected
+          openssl dgst -sha512 -binary "/tmp/$DEB" > /tmp/actual
+          if cmp -s /tmp/expected /tmp/actual; then
+            echo "Jellystream SHA-512 stimmt."
+          else
+            echo "::error::Jellystream SHA-512 abweichend - Hook 0015 wuerde den Build abbrechen."
+            echo "Erwartet (base64): LVQSTLE5sdx7aQvq3x7r2joNG95P459dvRDp9XwWtgtZzyLK7hpm7QUxktdLj2kOacM6Z3ki3sJpjuHZFsx9zw=="
+            echo "Tatsaechlich:      $(openssl dgst -sha512 -binary "/tmp/$DEB" | base64 -w0)"
+            exit 1
+          fi
+
+      - name: lb config dry run
+        run: |
+          # Prueft die Optionen in auto/config, ohne eine ISO zu bauen.
+          T=$(mktemp -d)
+          cp -a build/lb-config/auto "$T/auto"
+          chmod 0755 "$T/auto/config"
+          ( cd "$T" && bash auto/config )
+          grep -hE 'LB_DISTRIBUTION=|LB_UEFI_SECURE_BOOT|LB_IMAGE_TYPE|LB_BOOTLOADERS|LB_CHROOT_SQUASHFS_COMPRESSION_TYPE' \
+            "$T"/config/* | sort -u
+          # Die Basis muss Trixie sein, unabhaengig vom Runner-Image.
+          grep -q 'LB_DISTRIBUTION="trixie"' "$T"/config/bootstrap \
+            || { echo "::error::auto/config setzt nicht Trixie"; exit 1; }
+
+      - name: Summary
+        run: |
+          {
+            echo "### Preflight bestanden"
+            echo ""
+            echo "| Pruefung | Ergebnis |"
+            echo "|---|---|"
+            echo "| Zeilenenden | LF, kein CR |"
+            echo "| Hook-Syntax | alle 11 Hooks OK |"
+            echo "| Paketliste (Trixie) | loest zu ${PKG_COUNT} Paketen auf |"
+            echo "| Externe Hosts | alle HTTP 200 |"
+            echo "| Jellystream SHA-512 | stimmt |"
+            echo "| Basis | Debian 13 Trixie |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # Stufe 2: Der eigentliche ISO-Build in einem Trixie-Container.
+  # live-build braucht echte Kernel-Features (chroot, mount, mknod), deshalb
+  # laeuft der Container privilegiert.
+  # ---------------------------------------------------------------------------
+  build:
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 300   # Limit des Runners ist 360; 300 laesst Luft zum Aufraeumen
+    outputs:
+      iso-name:   ${{ steps.result.outputs.iso-name }}
+      iso-size:   ${{ steps.result.outputs.iso-size }}
+      iso-sha256: ${{ steps.result.outputs.iso-sha256 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          # Der Runner hat nur 14 GB, der Build braucht ~9 GB Spitze.
+          # Das vorinstallierte Image belegt mehrere GB, die hier weichen.
+          echo "Vorher:"; df -h / | tail -1
+          sudo rm -rf \
+            /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/share/boost /usr/local/graalvm /usr/local/.ghcup \
+            /usr/local/share/powershell /usr/local/share/chromium \
+            /usr/local/lib/node_modules /opt/hostedtoolcache/CodeQL || true
+          sudo docker image prune --all --force || true
+          sudo apt-get clean
+          echo "Nachher:"; df -h / | tail -1
+
+      - name: Build ISO in Debian Trixie container
+        run: |
+          set -euo pipefail
+          mkdir -p output
+          # --privileged: debootstrap braucht mknod, live-build braucht mount.
+          docker run --rm --privileged \
+            -v "$PWD:/src:ro" \
+            -v "$PWD/output:/output" \
+            -e DEBIAN_FRONTEND=noninteractive \
+            debian:trixie \
+            bash -euo pipefail -c '
+              apt-get update -qq
+              apt-get install -y --no-install-recommends \
+                live-build debootstrap squashfs-tools zstd xorriso \
+                isolinux syslinux-common grub-efi-amd64-bin grub-pc-bin \
+                grub2-common mtools dosfstools rsync wget curl git \
+                python3 ca-certificates
+
+              mkdir -p /build && cd /build
+              cp -a /src/build/lb-config/. /build/
+
+              # CR entfernen, damit eine unter Windows gespeicherte Datei den
+              # Build nicht kippt (ein CR am Zeilenende macht aus "...; do"
+              # ein "do\r" und bash bricht ab).
+              find /build -type f \( -name "*.hook.chroot" -o -name "*.hook.binary" \
+                   -o -name "*.list.chroot" -o -name "*.list.binary" -o -name "config" \
+                   -o -name "build" -o -name "clean" \) -exec sed -i "s/\r$//" {} +
+
+              mkdir -p config
+              for c in hooks package-lists includes.chroot; do
+                [ -d "$c" ] || continue
+                rm -rf "config/$c"; cp -a "$c" "config/$c"
+              done
+              find config/hooks -type f -name "*.hook.chroot" -exec chmod 0755 {} + || true
+              chmod 0755 auto/config auto/build auto/clean
+
+              lb clean || true
+              bash auto/config
+
+              # Exit-Status von lb build erhalten - "| tee" wuerde ihn
+              # verschlucken und einen Fehlschlag als Erfolg tarnen.
+              set +e
+              lb build 2>&1 | tee /build/build.log
+              rc=${PIPESTATUS[0]}
+              set -e
+              if [ "$rc" -ne 0 ]; then
+                echo "::error::lb build fehlgeschlagen (rc=$rc)"
+                echo "--- letzte 60 Logzeilen ---"
+                tail -60 /build/build.log
+                exit "$rc"
+              fi
+
+              iso=$(find /build -maxdepth 1 -name "*.iso" -print -quit)
+              if [ -z "$iso" ]; then
+                echo "::error::lb build meldete Erfolg, erzeugte aber keine ISO"
+                tail -60 /build/build.log
+                exit 1
+              fi
+              cp "$iso" /output/viperos-1.0-amd64.iso
+              cp /build/build.log /output/build.log
+              cd /output
+              sha256sum viperos-1.0-amd64.iso > viperos-1.0-amd64.iso.sha256
+              echo "ISO fertig: $(du -h viperos-1.0-amd64.iso | cut -f1)"
+            '
+
+      - name: Verify ISO
+        id: result
+        run: |
+          set -euo pipefail
+          ISO=output/viperos-1.0-amd64.iso
+          [ -f "$ISO" ] || { echo "::error::ISO fehlt"; exit 1; }
+
+          # Checksumme gegenpruefen, nicht nur erzeugen.
+          ( cd output && sha256sum -c viperos-1.0-amd64.iso.sha256 )
+
+          bytes=$(stat -c%s "$ISO")
+          mib=$(( bytes / 1024 / 1024 ))
+          sha=$(cut -d' ' -f1 output/viperos-1.0-amd64.iso.sha256)
+
+          # Eine ISO unter 700 MB kann kein XFCE-Desktop mit ~1600 Paketen sein.
+          if [ "$mib" -lt 700 ]; then
+            echo "::error::ISO ist nur ${mib} MB - der Build ist unvollstaendig"; exit 1
+          fi
+          # Release-Assets sind auf 2 GiB pro Datei begrenzt.
+          if [ "$bytes" -gt $((2 * 1024 * 1024 * 1024)) ]; then
+            echo "::warning::ISO ist ${mib} MB und ueberschreitet das 2-GiB-Limit fuer Release-Assets"
+          fi
+
+          # Bootfaehigkeit pruefen: El-Torito-Katalog und die Partitionstabelle
+          # des Hybrid-Images muessen vorhanden sein.
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends xorriso >/dev/null
+          xorriso -indev "$ISO" -report_el_torito plain 2>/dev/null | head -20 || true
+          if xorriso -indev "$ISO" -report_el_torito plain 2>/dev/null | grep -qi 'El Torito'; then
+            echo "El-Torito-Bootkatalog vorhanden."
+          else
+            echo "::warning::Kein El-Torito-Bootkatalog gefunden - ISO bootet moeglicherweise nicht"
+          fi
+          # EFI-Partition (Secure Boot / UEFI-Start)
+          if xorriso -indev "$ISO" -report_system_area plain 2>/dev/null | grep -qiE 'gpt|mbr|protective'; then
+            echo "Hybrid-Partitionstabelle vorhanden (BIOS + UEFI)."
+          fi
+
+          echo "iso-name=viperos-1.0-amd64.iso" >> "$GITHUB_OUTPUT"
+          echo "iso-size=${mib} MB"             >> "$GITHUB_OUTPUT"
+          echo "iso-sha256=${sha}"              >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### ISO gebaut"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Datei | viperos-1.0-amd64.iso |"
+            echo "| Groesse | ${mib} MB |"
+            echo "| SHA-256 | \`${sha}\` |"
+            echo "| Basis | Debian 13 Trixie |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: viperos-iso
+          path: |
+            output/viperos-1.0-amd64.iso
+            output/viperos-1.0-amd64.iso.sha256
+          # Hinweis: Der Free-Plan hat nur 500 MB Artifact-Speicher. Eine ~1.8 GB
+          # ISO passt dort nicht dauerhaft, daher kurze Aufbewahrung. Fuer
+          # dauerhafte Ablage den Workflow mit release=true starten - Releases
+          # sind unbegrenzt (max. 2 GiB je Datei).
+          retention-days: 5
+          compression-level: 0   # ISO ist bereits zstd-komprimiert
+          if-no-files-found: error
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: output/build.log
+          retention-days: 14
+          if-no-files-found: warn
+
+  # ---------------------------------------------------------------------------
+  # Stufe 3: Optionales Release. Nur bei manuellem Start mit release=true.
+  # ---------------------------------------------------------------------------
+  release:
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # nur dieser Job darf schreiben
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: viperos-iso
+          path: dist
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VER="${{ inputs.version }}"
+          [ -z "$VER" ] && VER="1.0-build${{ github.run_number }}"
+          TAG="v${VER}"
+
+          # <<-EOF entfernt fuehrende TABS, nicht Leerzeichen. Da YAML mit
+          # Leerzeichen einrueckt, wird die Datei zeilenweise geschrieben.
+          {
+            echo "# ViperOS ${VER}"
+            echo ""
+            echo "Live-ISO auf Basis von **Debian 13 (Trixie)**, XFCE-Desktop,"
+            echo "Calamares-Installer."
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Groesse | ${{ needs.build.outputs.iso-size }} |"
+            echo "| SHA-256 | \`${{ needs.build.outputs.iso-sha256 }}\` |"
+            echo "| Commit | \`${{ github.sha }}\` |"
+            echo ""
+            echo "## Pruefen"
+            echo ""
+            echo '```'
+            echo "sha256sum -c viperos-1.0-amd64.iso.sha256"
+            echo '```'
+            echo ""
+            echo "## Live-Zugang"
+            echo ""
+            echo "Benutzer \`viperos\`, Passwort \`viperos\` (nur in der Live-Sitzung)."
+            echo ""
+            echo "> Noch nicht auf echter Hardware verifiziert. Vor dem Verteilen in"
+            echo "> einer VM mit UEFI **und** Legacy-BIOS testen."
+          } > notes.md
+
+          gh release create "$TAG" \
+            --repo "${{ github.repository }}" \
+            --title "ViperOS ${VER}" \
+            --notes-file notes.md \
+            dist/viperos-1.0-amd64.iso \
+            dist/viperos-1.0-amd64.iso.sha256

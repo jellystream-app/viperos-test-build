@@ -1,0 +1,47 @@
+#!/bin/sh
+# ViperosOS - live-build Auto-Konfiguration
+# Basis: Debian 13 (Trixie) - aktuelles Debian stable
+#
+# WICHTIG: --distribution trixie ist bewusst fest gesetzt und unabhaengig von
+# der Debian-Version der Build-Maschine. live-build baut damit immer ein
+# Trixie-Image, egal ob der Build unter GitHub Actions (Ubuntu-Runner) oder
+# lokal in WSL laeuft. Die Paketliste wird im Preflight gegen Trixie geprueft,
+# nicht gegen den Host.
+#
+# --debian-installer-distribution wird explizit gesetzt, damit der Installer
+# nicht versehentlich Artefakte einer anderen Suite zieht.
+#
+# --uefi-secure-boot enable bindet shim-signed/grub-efi-amd64-signed ein, damit
+# das Live-ISO auch auf Rechnern mit aktiviertem Secure Boot startet.
+
+set -e
+
+lb config noauto \
+    --system        live \
+    --distribution  trixie \
+    --debian-installer-distribution trixie \
+    --archive-areas "main contrib non-free non-free-firmware" \
+    --apt-indices   false \
+    --apt-recommends false \
+    --binary-images iso-hybrid \
+    --bootloaders   "grub-pc grub-efi" \
+    --uefi-secure-boot enable \
+    --debian-installer live \
+    --debian-installer-gui false \
+    --image-name    "viperos-1.0" \
+    --iso-application "ViperosOS 1.0" \
+    --iso-publisher "ViperosOS Project" \
+    --iso-volume    "VIPEROS_1_0" \
+    --memtest       none \
+    --firmware-binary    true \
+    --firmware-chroot    true \
+    --chroot-squashfs-compression-type zstd \
+    --cache true \
+    --cache-packages true \
+    --checksums sha256 \
+    --mirror-bootstrap  "https://deb.debian.org/debian/" \
+    --mirror-chroot     "https://deb.debian.org/debian/" \
+    --mirror-binary     "https://deb.debian.org/debian/" \
+    --mirror-chroot-security "https://security.debian.org/debian-security/" \
+    --mirror-binary-security "https://security.debian.org/debian-security/" \
+    "${@}"

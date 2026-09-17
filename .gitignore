@@ -1,0 +1,26 @@
+# Build-Artefakte - die ISO gehoert nicht ins Repo (~1.8 GB)
+output/
+*.iso
+*.iso.sha256
+*.squashfs
+build.log
+
+# live-build Arbeitsverzeichnisse, falls lokal gebaut wird
+build/lb-config/config/
+build/lb-config/.build/
+build/lb-config/cache/
+build/lb-config/chroot/
+build/lb-config/binary/
+build/lb-config/local/
+build/lb-config/*.log
+build/lb-config/*.iso
+
+# temporaere Pruefskripte
+scripts/.*.sh
+scripts/.*.ps1
+scripts/.*.py
+
+# OS-Kram
+Thumbs.db
+desktop.ini
+.DS_Store

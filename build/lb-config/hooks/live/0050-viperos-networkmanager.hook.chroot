@@ -1,0 +1,57 @@
+#!/bin/bash
+# ViperosOS - NetworkManager Konfiguration
+
+set -e
+
+echo "[ViperosOS] Konfiguriere NetworkManager..."
+
+# Verzeichnisse sicherstellen
+mkdir -p /etc/NetworkManager /etc/network/interfaces.d /etc/xdg/autostart
+
+# NetworkManager Hauptkonfiguration
+cat > /etc/NetworkManager/NetworkManager.conf << 'EOF'
+[main]
+plugins=ifupdown,keyfile
+dns=default
+
+[ifupdown]
+managed=true
+
+[device]
+wifi.scan-rand-mac-address=yes
+
+[connection]
+connection.stable-id=${CONNECTION}/${BOOT}
+EOF
+
+# Verhindere, dass ifupdown-Netzwerke von NM ignoriert werden
+cat > /etc/network/interfaces << 'EOF'
+# Diese Datei wird von NetworkManager verwaltet
+# Manuelle Änderungen können überschrieben werden
+source /etc/network/interfaces.d/*
+
+auto lo
+iface lo inet loopback
+EOF
+
+# NetworkManager aktivieren
+systemctl enable NetworkManager 2>/dev/null || true
+systemctl disable networking 2>/dev/null || true
+
+# nm-applet Autostart
+mkdir -p /etc/xdg/autostart
+cat > /etc/xdg/autostart/nm-applet.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=Network Manager Applet
+Comment=Netzwerkverbindungen verwalten
+Exec=nm-applet
+Icon=network-wireless
+Terminal=false
+Categories=GNOME;GTK;System;Tray;
+StartupNotify=false
+AutostartCondition=GNOME3 unless-session gnome
+X-GNOME-Autostart-enabled=true
+EOF
+
+echo "[ViperosOS] NetworkManager konfiguriert."
