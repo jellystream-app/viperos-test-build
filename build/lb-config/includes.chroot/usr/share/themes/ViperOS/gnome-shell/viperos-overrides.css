@@ -27,35 +27,26 @@ stage {
   color: #e7eef9;
 }
 
-/* ---------- Obere Leiste: schwebend ----------
-   WICHTIG: "margin" wirkt hier NICHT. Die Leiste wird von der Shell
-   selbst positioniert (Main.layoutManager.panelBox), und St wertet an
-   #panel weder margin noch eine Verschiebung per CSS aus - beides wird
-   stillschweigend verworfen. Genau deshalb blieb die Leiste zuvor steif
-   am Rand kleben und die Rundung war nicht zu sehen.
+/* ---------- Obere Leiste ----------
+   Abstand, Rundung, Rahmen und Hintergrundfarbe setzt die Erweiterung
+   viperos-panel@viperos.os direkt am Actor:
 
-   Den Abstand erzeugt die Erweiterung viperos-panel@viperos.os, die die
-   panelBox verschiebt und schmaler macht. Sie setzt dabei die Klasse
-   "viperos-floating" - nur dann sollen die runden Ecken gelten, damit
-   die Leiste ohne Erweiterung nicht halb abgeschnitten aussieht.      */
+     - "margin" wirkt an #panel nicht. Die Leiste wird von der Shell
+       positioniert (Main.layoutManager.panelBox); St verwirft die
+       Angabe stillschweigend. Die Erweiterung verschiebt deshalb die
+       panelBox selbst.
+     - Die Rundung stand zuvor in einer Klassenregel
+       (#panel.viperos-floating). Die hat nicht gegriffen, die Ecken
+       blieben spitz. Jetzt setzt die Erweiterung sie per set_style -
+       ein Inline-Stil hat in St hoechste Prioritaet und kann von
+       keiner Themenregel ueberschrieben werden.
+
+   Hier bleiben nur Schrift und Hoehe, damit sich beides nicht
+   widerspricht.                                                      */
 #panel {
-  background-color: rgba(18, 21, 31, 0.88);
   font-weight: 600;
   height: 2.3em;
   transition-duration: 250ms;
-}
-
-#panel.viperos-floating {
-  border-radius: 16px;
-  border: 1px solid rgba(106, 143, 216, 0.22);
-}
-
-#panel:overview {
-  background-color: rgba(18, 21, 31, 0.42);
-}
-
-#panel.viperos-floating:overview {
-  border-color: rgba(106, 143, 216, 0.10);
 }
 
 /* Die Eckfuellungen, die GNOME unter die Leiste zeichnet, wuerden bei

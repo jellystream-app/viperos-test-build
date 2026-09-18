@@ -1,18 +1,19 @@
-/* ViperOS - schwebende Topbar
+/* ViperOS - schwebende Topbar mit runden Ecken
  *
- * Warum eine Erweiterung noetig ist:
- * Die obere Leiste wird von GNOME selbst positioniert
- * (Main.layoutManager.panelBox). St, das Toolkit der Shell, wertet an
- * #panel WEDER margin NOCH eine Verschiebung per CSS aus - beides wird
- * stillschweigend verworfen. Ein "margin: 6px 8px" im Stylesheet bleibt
- * deshalb wirkungslos, die Leiste klebt am Rand, und ein border-radius
- * ist an einer randlosen Leiste nicht zu sehen: sie wirkt steif und eckig.
+ * Zwei Dinge, die vorher falsch waren:
  *
- * Diese Erweiterung verschiebt die panelBox per JavaScript und verkleinert
- * sie um den doppelten Randabstand. Erst dadurch werden die abgerundeten
- * Ecken sichtbar.
+ * 1. Die Rundung hing an einer CSS-Klasse (#panel.viperos-floating).
+ *    Sie hat nicht gegriffen - die Ecken blieben spitz. Statt den Fehler
+ *    im Selektor zu suchen, wird der Stil jetzt direkt am Actor gesetzt
+ *    (set_style). Ein Inline-Stil hat in St die hoechste Prioritaet und
+ *    kann von keiner Themenregel ueberschrieben werden.
  *
- * Beim Deaktivieren wird alles zurueckgesetzt.
+ * 2. Die Leiste wurde verschoben, ohne die Arbeitsflaeche neu zu
+ *    berechnen. GNOME leitet aus der Position der panelBox ab, wo der
+ *    nutzbare Bereich beginnt; ohne Neuberechnung legt "Desktop Icons"
+ *    seine Symbole weiterhin ganz oben ab - sie lagen dann unter der
+ *    Leiste. Deshalb wird nach dem Verschieben die Regionsberechnung
+ *    angestossen.
  */
 
 import GLib from 'gi://GLib';
@@ -20,53 +21,89 @@ import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 const MARGIN_SIDE = 10;   // Abstand links und rechts
-const MARGIN_TOP  = 6;    // Abstand nach oben
+const MARGIN_TOP = 6;     // Abstand nach oben
+const RADIUS = 16;        // Eckenradius
+
+const PANEL_STYLE = `
+    border-radius: ${RADIUS}px;
+    border: 1px solid rgba(106, 143, 216, 0.22);
+    background-color: rgba(18, 21, 31, 0.88);
+`;
 
 export default class ViperPanelExtension {
     enable() {
         this._panelBox = Main.layoutManager.panelBox;
         this._timeoutId = 0;
 
-        // Ausgangswerte merken, um sie beim Abschalten wiederherzustellen.
         this._origX = this._panelBox.x;
         this._origY = this._panelBox.y;
         this._origWidth = this._panelBox.width;
+        this._origStyle = Main.panel.get_style();
 
-        // Die Shell setzt die Position bei jeder Aenderung der
-        // Bildschirmgeometrie neu - also erneut anwenden, wenn das passiert.
+        // Die Shell setzt Position und Groesse neu, sobald sich die
+        // Bildschirmgeometrie oder der Sitzungsmodus aendert.
         this._monitorsId = Main.layoutManager.connect(
             'monitors-changed', () => this._apply());
         this._sessionId = Main.sessionMode.connect(
             'updated', () => this._apply());
 
-        // Marker fuer die CSS: nur wenn die Erweiterung laeuft, sollen die
-        // abgerundeten Ecken gelten.
-        Main.panel.add_style_class_name('viperos-floating');
-
         this._apply();
     }
 
     _apply() {
-        // Verzoegern, bis die Shell ihre eigene Positionierung beendet hat.
         if (this._timeoutId)
             GLib.source_remove(this._timeoutId);
 
-        this._timeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 80, () => {
+        // Kurz warten, bis die Shell ihre eigene Positionierung beendet hat.
+        this._timeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 120, () => {
             this._timeoutId = 0;
-
-            const monitor = Main.layoutManager.primaryMonitor;
-            if (!monitor || !this._panelBox)
-                return GLib.SOURCE_REMOVE;
-
-            const scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
-            const side = MARGIN_SIDE * scale;
-            const top = MARGIN_TOP * scale;
-
-            this._panelBox.set_position(monitor.x + side, monitor.y + top);
-            this._panelBox.set_width(monitor.width - (side * 2));
-
+            this._position();
             return GLib.SOURCE_REMOVE;
         });
+    }
+
+    _position() {
+        const monitor = Main.layoutManager.primaryMonitor;
+        if (!monitor || !this._panelBox)
+            return;
+
+        let scale = 1;
+        try {
+            scale = St.ThemeContext.get_for_stage(global.stage).scale_factor;
+        } catch (e) {
+            // Ohne Skalierungsfaktor mit 1 weiterarbeiten.
+        }
+
+        const side = MARGIN_SIDE * scale;
+        const top = MARGIN_TOP * scale;
+
+        this._panelBox.set_position(monitor.x + side, monitor.y + top);
+        this._panelBox.set_width(monitor.width - side * 2);
+
+        // Rundung direkt am Actor - unabhaengig von jedem CSS-Selektor.
+        Main.panel.set_style(PANEL_STYLE);
+
+        // Arbeitsflaeche neu berechnen, damit Fenster und Schreibtisch-
+        // symbole unterhalb der Leiste beginnen statt darunter zu liegen.
+        this._updateRegions();
+    }
+
+    _updateRegions() {
+        const lm = Main.layoutManager;
+        // Je nach Shell-Version heisst die Methode anders; die erste
+        // vorhandene wird benutzt. Schlaegt alles fehl, bleibt nur die
+        // Ueberlappung - die Shell laeuft weiter.
+        for (const name of ['_queueUpdateRegions', '_updateRegions',
+                            'queueUpdateRegions']) {
+            if (typeof lm[name] === 'function') {
+                try {
+                    lm[name]();
+                    return;
+                } catch (e) {
+                    // naechste Variante versuchen
+                }
+            }
+        }
     }
 
     disable() {
@@ -85,12 +122,14 @@ export default class ViperPanelExtension {
             this._sessionId = 0;
         }
 
-        Main.panel.remove_style_class_name('viperos-floating');
+        Main.panel.set_style(this._origStyle ?? null);
 
         if (this._panelBox) {
             this._panelBox.set_position(this._origX, this._origY);
             this._panelBox.set_width(this._origWidth);
             this._panelBox = null;
         }
+
+        this._updateRegions();
     }
 }
