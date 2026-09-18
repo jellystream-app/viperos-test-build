@@ -218,6 +218,97 @@ jobs:
               echo "auto/config OK: Trixie + Secure Boot"
             '
 
+      - name: Validate dconf settings
+        run: |
+          # Diese Pruefung fehlte und hat einen Fehler bis in ein gebootetes
+          # ISO durchgelassen: "enabled-extensions=[]" ist fuer dconf ein
+          # Typfehler ("unable to infer type"), wodurch die GANZE Datei
+          # verworfen wird. Weil GDM seine Greeter-Datenbank per
+          # ExecStartPre kompiliert, scheiterte damit der Dienststart -
+          # sichtbar erst beim Booten als "Failed to start gdm.service".
+          #
+          # dconf compile meldet solche Fehler in Sekunden.
+          sudo apt-get install -y --no-install-recommends dconf-cli >/dev/null
+
+          bad=0
+          T=$(mktemp -d)
+
+          # Jeden dconf-Block aus den Hooks extrahieren und einzeln
+          # kompilieren - so, wie das System es spaeter tut.
+          python3 - "$T" <<'PYEOF'
+          import re, sys, pathlib
+          out = pathlib.Path(sys.argv[1])
+          hooks = pathlib.Path('build/lb-config/hooks/live')
+          blocks = [
+              ('local',  r"cat > /etc/dconf/db/local\.d/00-viperos << 'EOF'\n(.*?)\nEOF"),
+              ('gdm',    r"cat > /etc/gdm3/greeter\.dconf-defaults << 'EOF'\n(.*?)\nEOF"),
+          ]
+          found = 0
+          for hook in sorted(hooks.glob('*.hook.chroot')):
+              src = hook.read_text(encoding='utf-8')
+              for name, pat in blocks:
+                  m = re.search(pat, src, re.S)
+                  if m:
+                      d = out / name
+                      d.mkdir(parents=True, exist_ok=True)
+                      (d / '00-viperos').write_text(m.group(1), encoding='utf-8')
+                      print(f"  {hook.name} -> {name} ({len(m.group(1).splitlines())} Zeilen)")
+                      found += 1
+          if not found:
+              print("::warning::keine dconf-Bloecke gefunden")
+          PYEOF
+
+          for d in "$T"/*/; do
+            [ -d "$d" ] || continue
+            name=$(basename "$d")
+            if dconf compile "$T/$name.db" "$d" 2>"$T/$name.err"; then
+              echo "  OK       $name ($(stat -c%s "$T/$name.db") Bytes)"
+            else
+              echo "::error::dconf-Fehler in $name:"
+              sed 's/^/    /' "$T/$name.err"
+              bad=1
+            fi
+          done
+          exit "$bad"
+
+      - name: Validate shell theme
+        run: |
+          # Das Shell-Theme ERSETZT GNOMEs Stylesheet, es ergaenzt es nicht
+          # (Main.setThemeStylesheet). Ein zu kleines Theme laesst darum
+          # tausende Regeln weg und die Oberflaeche faellt auf
+          # St-Voreinstellungen zurueck. Deshalb hier pruefen, dass die
+          # Basis mitgeliefert wird und gross genug ist.
+          T=build/lb-config/includes.chroot/usr/share/themes/ViperOS/gnome-shell
+          base="$T/gnome-shell-base.css"
+          over="$T/viperos-overrides.css"
+
+          for f in "$base" "$over"; do
+            [ -f "$f" ] || { echo "::error::$f fehlt"; exit 1; }
+          done
+
+          bsz=$(stat -c%s "$base")
+          osz=$(stat -c%s "$over")
+          echo "  Basis:           $bsz Bytes"
+          echo "  Ueberschreibung: $osz Bytes"
+          echo "  zusammen:        $((bsz + osz)) Bytes"
+
+          # GNOMEs Standard-CSS ist ~175 KB. Liegt die Basis deutlich
+          # darunter, wurde sie nicht vollstaendig extrahiert.
+          if [ "$bsz" -lt 150000 ]; then
+            echo "::error::Basis-CSS ist nur $bsz Bytes - unvollstaendig"
+            exit 1
+          fi
+
+          # Klammern muessen ausgeglichen sein, sonst verwirft St die Datei.
+          python3 - "$over" <<'PYEOF'
+          import sys, pathlib
+          css = pathlib.Path(sys.argv[1]).read_text(encoding='utf-8')
+          if css.count('{') != css.count('}'):
+              print(f"::error::CSS-Klammern unausgeglichen: {css.count('{')} vs {css.count('}')}")
+              sys.exit(1)
+          print(f"  {css.count('{')} Regeln, Klammern ausgeglichen")
+          PYEOF
+
       - name: Summary
         run: |
           {
@@ -226,8 +317,10 @@ jobs:
             echo "| Pruefung | Ergebnis |"
             echo "|---|---|"
             echo "| Zeilenenden | LF, kein CR |"
-            echo "| Hook-Syntax | alle 11 Hooks OK |"
+            echo "| Hook-Syntax | alle Hooks OK |"
             echo "| Paketliste (Trixie) | loest zu ${PKG_COUNT} Paketen auf |"
+            echo "| dconf-Vorgaben | kompilieren fehlerfrei |"
+            echo "| Shell-Theme | Basis vorhanden, CSS gueltig |"
             echo "| Externe Hosts | alle HTTP 200 |"
             echo "| Jellystream SHA-512 | stimmt |"
             echo "| Basis | Debian 13 Trixie |"
