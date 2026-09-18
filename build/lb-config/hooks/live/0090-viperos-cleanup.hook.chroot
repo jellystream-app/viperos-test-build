@@ -40,12 +40,12 @@ systemctl enable NetworkManager 2>/dev/null || true
 systemctl enable lightdm 2>/dev/null || true
 systemctl enable bluetooth 2>/dev/null || true
 
-# PipeWire als Audio-Stack aktivieren (User-Units, greifen pro Session).
-# In Trixie ersetzt pipewire-pulse den PulseAudio-Daemon; die Units muessen
-# fuer neue Benutzer per systemctl --global aktiviert sein.
-systemctl --global enable pipewire.socket 2>/dev/null || true
-systemctl --global enable pipewire-pulse.socket 2>/dev/null || true
-systemctl --global enable wireplumber.service 2>/dev/null || true
+# Audio wird vollstaendig in 0055-viperos-audio eingerichtet.
+# Frueher standen hier drei "systemctl --global enable"-Aufrufe. Ohne
+# laufenden systemd im Chroot schlagen die fehl, und durch
+# "2>/dev/null || true" blieb das unsichtbar - der Hook meldete Erfolg,
+# die Units waren aber nie aktiviert. Nicht wieder aufnehmen: 0055 setzt
+# die Symlinks direkt, was ohne systemd zuverlaessig funktioniert.
 
 # Sprachpakete für Firefox
 update-locale 2>/dev/null || true

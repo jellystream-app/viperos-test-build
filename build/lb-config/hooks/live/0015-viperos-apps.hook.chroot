@@ -45,7 +45,39 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib, Pango
 
-LIVE_SYSTEM = os.path.exists("/run/live/medium")
+def detect_live():
+    """Laeuft ViperOS vom Live-Medium?
+
+    Nicht an einem einzelnen Pfad festmachen: /run/live/medium wird von
+    live-boot nur an zwei Stellen gesetzt und kann je nach Bootart fehlen
+    (findiso, fromiso, toram). Faellt die Erkennung falsch aus, verschwindet
+    der Installationsknopf - also mehrere Marker pruefen.
+    """
+    for path in ("/run/live/medium", "/run/live/overlay",
+                 "/run/live/rootfs", "/lib/live/mount/medium"):
+        if os.path.exists(path):
+            return True
+    try:
+        with open("/proc/cmdline", "r", encoding="utf-8", errors="replace") as fh:
+            cmdline = fh.read()
+        if "boot=live" in cmdline or "findiso=" in cmdline or "fromiso=" in cmdline:
+            return True
+    except OSError:
+        pass
+    # Letzter Hinweis: das Wurzeldateisystem eines Live-Systems ist ein
+    # overlay bzw. aufs, keine echte Partition.
+    try:
+        with open("/proc/mounts", "r", encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                parts = line.split()
+                if len(parts) >= 3 and parts[1] == "/" and parts[2] in ("overlay", "aufs", "overlayfs"):
+                    return True
+    except OSError:
+        pass
+    return False
+
+
+LIVE_SYSTEM = detect_live()
 ACCENT = "#55a5f7"
 
 CSS = b"""
@@ -408,14 +440,17 @@ class Hub(Gtk.Window):
         actions.set_column_spacing(12)
         actions.set_row_spacing(12)
         actions.set_homogeneous(True)
-        if LIVE_SYSTEM:
-            actions.add(self.action_button(
-                "ViperOS installieren",
-                "Dauerhaft auf diesem Gerät einrichten.",
-                self.on_install, primary=True))
+        # Installationsknopf immer anzeigen. Haengt er an der Live-Erkennung
+        # und die schlaegt fehl, ist der Installer unerreichbar - genau das
+        # Problem, das hier behoben wird. Ist calamares nicht vorhanden,
+        # erklaert der Knopf das beim Klick statt einfach zu fehlen.
+        actions.add(self.action_button(
+            "ViperOS installieren",
+            "Dauerhaft auf diesem Gerät einrichten.",
+            self.on_install, primary=True))
         actions.add(self.action_button(
             "System aktualisieren", "Sicherheitsupdates einspielen.",
-            self.on_update, primary=not LIVE_SYSTEM))
+            self.on_update))
         actions.add(self.action_button(
             "Netzwerk verwalten", "WLAN, VPN und Verbindungen.", self.on_network))
         actions.add(self.action_button(
@@ -579,7 +614,59 @@ class Hub(Gtk.Window):
         self.launch(["xfce4-terminal", "--command",
                      "bash -lc '%s; echo; read -p \"Enter zum Schliessen\"'" % command])
 
-    def on_install(self, _b):   self.launch(["pkexec", "calamares"])
+    def problem(self, title, detail):
+        dialog = Gtk.MessageDialog(
+            transient_for=self, modal=True,
+            message_type=Gtk.MessageType.WARNING, buttons=Gtk.ButtonsType.CLOSE,
+            text=title)
+        dialog.format_secondary_text(detail)
+        dialog.run()
+        dialog.destroy()
+
+    def on_install(self, _b):
+        """Installation starten - mit klarer Meldung, wenn etwas fehlt.
+
+        pkexec zeigt seinen Passwortdialog nur, wenn in der Sitzung ein
+        polkit-Authentication-Agent laeuft. Fehlt er, passierte bisher
+        einfach nichts. Hier wird das geprueft und benannt.
+        """
+        if shutil.which("calamares") is None:
+            self.problem("Installer nicht gefunden",
+                         "Das Paket calamares ist in diesem Image nicht "
+                         "vorhanden. Eine Installation ist damit nicht "
+                         "moeglich.")
+            return
+
+        agent_running = False
+        for name in ("lxpolkit", "polkit-gnome-authentication-agent-1",
+                     "polkit-mate-authentication-agent-1",
+                     "polkit-kde-authentication-agent-1", "xfce-polkit"):
+            if subprocess.run(["pgrep", "-x", name],
+                              capture_output=True).returncode == 0:
+                agent_running = True
+                break
+
+        if not agent_running and shutil.which("lxpolkit"):
+            # Agent nachstarten und ihm einen Moment geben, sich am
+            # Systembus zu registrieren.
+            try:
+                subprocess.Popen(["lxpolkit"])
+                GLib.timeout_add_seconds(
+                    2, lambda: (self.launch(["pkexec", "calamares"]), False)[1])
+                return
+            except OSError:
+                pass
+
+        if not agent_running:
+            self.problem(
+                "Berechtigungsdialog nicht verfuegbar",
+                "Es laeuft kein PolicyKit-Agent, deshalb kann nicht nach dem "
+                "Administratorpasswort gefragt werden.\n\n"
+                "Alternative: ein Terminal oeffnen und dort eingeben:\n"
+                "    sudo calamares")
+            return
+
+        self.launch(["pkexec", "calamares"])
     def on_update(self, _b):    self.launch(["pkexec", "/usr/local/lib/viperos/update-system"])
     def on_network(self, _b):   self.launch(["nm-connection-editor"])
     def on_files(self, _b):     self.launch(["thunar", os.path.expanduser("~")])

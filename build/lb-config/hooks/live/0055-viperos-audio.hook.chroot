@@ -1,0 +1,162 @@
+#!/bin/bash
+# ViperosOS - Audio (PipeWire) verlaesslich aktivieren
+#
+# Warum im Live-System kein Ton kam:
+#
+# 1. dbus-user-session fehlte. pipewire.service hat
+#    "Requires=pipewire.socket dbus.service" - gemeint ist die systemd-
+#    USER-Unit dbus.service, und die liefert nur dbus-user-session. Das
+#    Paket "dbus" allein bringt ausschliesslich die System-Unit. Ohne die
+#    User-Unit scheitert Requires= und PipeWire startet nie.
+#    (Behoben ueber die Paketliste.)
+#
+# 2. "systemctl --global enable" wurde in Hook 0090 ohne --root und mit
+#    "2>/dev/null || true" aufgerufen. Ohne laufenden systemd im Chroot
+#    schlaegt das fehl - der Fehler blieb durch die Umleitung unsichtbar.
+#    Hier werden die Symlinks stattdessen direkt gesetzt, was ohne
+#    laufenden systemd immer funktioniert.
+#
+# 3. Die ALSA-Mischpultregler waren nicht entstummt. Eine frische
+#    Installation hat Master/Speaker/Headphone oft auf 0 oder muted, und
+#    ohne gespeicherten Zustand in /var/lib/alsa/asound.state bleibt das
+#    auch so - PipeWire laeuft dann, es ist nur nichts zu hoeren.
+
+set -e
+
+echo "[ViperosOS] Konfiguriere Audio (PipeWire)..."
+
+# ----------------------------------------------------------------------
+# 1. User-Units aktivieren, ohne auf systemctl im Chroot zu setzen.
+#    "systemctl --global enable" braucht einen laufenden systemd; die
+#    Symlinks sind aber genau das, was der Befehl anlegen wuerde.
+# ----------------------------------------------------------------------
+mkdir -p /etc/systemd/user/sockets.target.wants \
+         /etc/systemd/user/default.target.wants \
+         /etc/systemd/user/pipewire.service.wants
+
+link_unit() {
+    unit="$1"; target="$2"
+    if [ -f "/usr/lib/systemd/user/$unit" ]; then
+        ln -sf "/usr/lib/systemd/user/$unit" "/etc/systemd/user/$target/$unit"
+        echo "  aktiviert: $unit -> $target"
+    else
+        echo "  WARNUNG: /usr/lib/systemd/user/$unit nicht vorhanden"
+    fi
+}
+
+# Sockets starten die Dienste bei Bedarf (socket activation).
+link_unit pipewire.socket        sockets.target.wants
+link_unit pipewire-pulse.socket  sockets.target.wants
+# WirePlumber ist der Session-Manager; ohne ihn bleiben die Geraete stumm.
+link_unit wireplumber.service    pipewire.service.wants
+# dbus.service (User) kommt aus dbus-user-session und ist dort bereits
+# per sockets.target.wants vorverdrahtet - hier nur zur Sicherheit.
+link_unit dbus.socket            sockets.target.wants
+
+# ----------------------------------------------------------------------
+# 2. PipeWire soll auch ohne systemd-User-Session anlaufen.
+#    Faellt die Session-Registrierung aus (z. B. weil pam_systemd nicht
+#    greift), springt dieser XDG-Autostart ein. Laeuft PipeWire schon,
+#    beendet sich der Start sofort wieder - doppelt schadet nicht.
+# ----------------------------------------------------------------------
+mkdir -p /usr/local/bin /etc/xdg/autostart
+
+cat > /usr/local/bin/viperos-audio-start << 'EOF'
+#!/bin/sh
+# Startet PipeWire nur, wenn es nicht bereits laeuft.
+set -u
+[ -n "${DISPLAY:-}" ] || exit 0
+
+# Laeuft der Stack schon (ueber systemd), nichts tun.
+if pgrep -u "$(id -u)" -x pipewire >/dev/null 2>&1; then
+    exit 0
+fi
+
+command -v pipewire >/dev/null 2>&1 || exit 0
+pipewire &
+sleep 1
+command -v wireplumber   >/dev/null 2>&1 && wireplumber &
+command -v pipewire-pulse >/dev/null 2>&1 && pipewire-pulse &
+exit 0
+EOF
+chmod 0755 /usr/local/bin/viperos-audio-start
+
+cat > /etc/xdg/autostart/viperos-audio.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=ViperOS Audio
+Comment=PipeWire starten, falls es nicht ueber systemd laeuft
+Exec=/usr/local/bin/viperos-audio-start
+Icon=audio-card
+Terminal=false
+NoDisplay=true
+OnlyShowIn=XFCE;
+X-GNOME-Autostart-enabled=true
+EOF
+
+# ----------------------------------------------------------------------
+# 3. ALSA entstummen. Der Zustand wird beim Booten des Live-Systems
+#    gesetzt, weil die Hardware zur Build-Zeit unbekannt ist.
+# ----------------------------------------------------------------------
+cat > /usr/local/bin/viperos-audio-unmute << 'EOF'
+#!/bin/sh
+# Hebt die Stummschaltung der gaengigen Regler auf und setzt eine
+# hoerbare Startlautstaerke. Fehlende Regler werden uebersprungen.
+set -u
+command -v amixer >/dev/null 2>&1 || exit 0
+
+# Alle erkannten Karten durchgehen, nicht nur Karte 0: auf Laptops ist
+# die interne Karte oft nicht die erste.
+cards=$(awk -F: '/^ *[0-9]+ \[/{gsub(/ /,"",$1); print $1}' /proc/asound/cards 2>/dev/null)
+[ -z "$cards" ] && cards=0
+
+for card in $cards; do
+    for control in Master Speaker Headphone PCM Front 'Digital' 'Line Out'; do
+        amixer -c "$card" sset "$control" unmute      >/dev/null 2>&1 || true
+        amixer -c "$card" sset "$control" 80%          >/dev/null 2>&1 || true
+    done
+    # Auto-Mute schaltet Lautsprecher stumm, sobald ein (nicht
+    # vorhandener) Kopfhoerer erkannt wird - das kostet sonst den Ton.
+    amixer -c "$card" sset 'Auto-Mute Mode' Disabled  >/dev/null 2>&1 || true
+done
+
+# Zustand sichern, damit alsa-restore ihn beim naechsten Start wiederherstellt.
+if command -v alsactl >/dev/null 2>&1; then
+    mkdir -p /var/lib/alsa
+    alsactl store >/dev/null 2>&1 || true
+fi
+exit 0
+EOF
+chmod 0755 /usr/local/bin/viperos-audio-unmute
+
+# Als System-Service beim Boot ausfuehren: zu diesem Zeitpunkt sind die
+# Soundkarten erkannt, aber noch keine Benutzersitzung aktiv.
+cat > /etc/systemd/system/viperos-audio-unmute.service << 'EOF'
+[Unit]
+Description=ViperOS: ALSA-Regler entstummen
+After=sound.target systemd-udev-settle.service
+Wants=sound.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/viperos-audio-unmute
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+mkdir -p /etc/systemd/system/multi-user.target.wants
+ln -sf /etc/systemd/system/viperos-audio-unmute.service \
+       /etc/systemd/system/multi-user.target.wants/viperos-audio-unmute.service
+
+# ----------------------------------------------------------------------
+# 4. Der Live-Benutzer braucht Zugriff auf die Audio-Geraete. Moderne
+#    Systeme regeln das ueber logind-ACLs, die Gruppe 'audio' bleibt aber
+#    der verlaessliche Fallback, wenn keine Sitzung registriert ist.
+# ----------------------------------------------------------------------
+if id viperos >/dev/null 2>&1; then
+    usermod -aG audio viperos 2>/dev/null || true
+fi
+
+echo "[ViperosOS] Audio konfiguriert (PipeWire-Units verlinkt, ALSA-Unmute aktiv)."

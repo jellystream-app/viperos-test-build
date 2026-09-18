@@ -14,9 +14,20 @@ gnupg
 openssl
 # apt-transport-https entfaellt: seit apt 1.5 im Kern enthalten
 dbus-x11
+# KRITISCH fuer den Ton: liefert die systemd-USER-Unit dbus.service.
+# pipewire.service hat "Requires=pipewire.socket dbus.service"; fehlt die
+# User-Unit, startet PipeWire nie und das System bleibt stumm. Das Paket
+# "dbus" allein liefert nur die System-Unit, nicht die User-Unit.
+dbus-user-session
 # policykit-1 war transitional -> polkitd + pkexec
 polkitd
 pkexec
+# KRITISCH fuer den Installer: pkexec braucht einen Authentication Agent,
+# der den Passwortdialog zeigt. Ohne Agent tut "pkexec calamares" schlicht
+# nichts - der Knopf "ViperOS installieren" wirkt dann kaputt.
+# lxpolkit ist mit 47 KB der kleinste GTK-Agent und zieht keinen
+# Desktop-Ballast nach (mate-polkit braucht accountsservice).
+lxpolkit
 
 # --- Live-Boot (CRITICAL) ---
 live-boot
@@ -130,10 +141,18 @@ bluez
 blueman
 
 # --- Audio (PipeWire ist der Standard-Stack in Trixie) ---
+# pipewire-audio ist das Metapaket und zieht pipewire-pulse, pipewire-alsa,
+# wireplumber und libspa-0.2-bluetooth zusammen.
 pipewire
+pipewire-audio
 pipewire-pulse
 pipewire-alsa
 wireplumber
+# Bluetooth-Audio (A2DP); ohne dieses Paket bleiben BT-Kopfhoerer stumm.
+libspa-0.2-bluetooth
+# Erlaubt PipeWire Echtzeit-Prioritaet - ohne rtkit knackst der Ton
+# unter Last.
+rtkit
 pavucontrol
 alsa-utils
 

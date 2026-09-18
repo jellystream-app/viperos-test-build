@@ -20,6 +20,10 @@ scripts/.*.sh
 scripts/.*.ps1
 scripts/.*.py
 
+# heruntergeladene Pakete und Vorschaubilder aus Testlaeufen
+*.deb
+*-preview.png
+
 # OS-Kram
 Thumbs.db
 desktop.ini
