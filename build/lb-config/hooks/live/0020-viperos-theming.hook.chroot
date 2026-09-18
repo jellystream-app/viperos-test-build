@@ -212,14 +212,19 @@ WHISKEREOF
   dafuer kein Accelerator-Event, deshalb kann xfconf sie nicht binden -
   "Super_L" und "<Super>" hier einzutragen bleibt wirkungslos.
   Gebunden wird sie stattdessen von xcape (siehe 0022-viperos-superkey),
-  das ein allein gedruecktes Super_L in Ctrl+Alt+F1 uebersetzt; dieses
-  Kuerzel ruft hier das Whisker-Menue auf.
+  das ein allein gedruecktes Super_L in XF86LaunchA uebersetzt; dieses
+  Keysym ruft hier das Whisker-Menue auf.
+
+  NICHT Ctrl+Alt+F1 verwenden: das ist der VT-Wechsel auf die Textkonsole
+  (xkb symbols/srvr_ctrl -> compat/xfree86 SwitchScreen). Ein Druck auf
+  Super landete dadurch auf tty1 mit Login-Prompt ("authentication
+  failure"), waehrend der Desktop unsichtbar weiterlief.
 -->
 <channel name="xfce4-keyboard-shortcuts" version="1.0">
   <property name="commands" type="empty">
     <property name="custom" type="empty">
       <property name="override" type="bool" value="true"/>
-      <property name="&lt;Primary&gt;&lt;Alt&gt;F1" type="string" value="xfce4-popup-whiskermenu"/>
+      <property name="XF86LaunchA" type="string" value="xfce4-popup-whiskermenu"/>
       <property name="&lt;Super&gt;space" type="string" value="xfce4-appfinder"/>
       <property name="&lt;Primary&gt;&lt;Alt&gt;t" type="string" value="xfce4-terminal"/>
       <property name="&lt;Super&gt;e" type="string" value="thunar"/>

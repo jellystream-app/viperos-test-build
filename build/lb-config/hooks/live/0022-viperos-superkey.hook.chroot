@@ -7,10 +7,21 @@
 # ein Eintrag "Super_L" in xfce4-keyboard-shortcuts.xml bleibt wirkungslos.
 #
 # Loesung: xcape lauscht auf ein ALLEIN gedruecktes Super_L (ohne weitere
-# Taste) und sendet dann Ctrl+Alt+F1. Genau dieses Kuerzel ist in
+# Taste) und sendet dann XF86LaunchA. Dieses Keysym ist in
 # xfce4-keyboard-shortcuts.xml auf xfce4-popup-whiskermenu gelegt.
 # Super in Kombination (Super+E, Super+T) funktioniert davon unabhaengig
 # weiterhin als normaler Modifier.
+#
+# NICHT Ctrl+Alt+F1 verwenden! Das ist in X11 der VT-Wechsel auf die
+# Textkonsole, nicht ein freies Kuerzel:
+#   xkb/symbols/srvr_ctrl: key <FK01> {[ F1,F1,F1,F1, XF86_Switch_VT_1 ]}
+#   xkb/compat/xfree86:    interpret XF86_Switch_VT_1 {
+#                            action = SwitchScreen(Screen=1, !SameServer); }
+#   xkb/symbols/pc:55:     include "srvr_ctrl(fkey2vt)"   <- immer aktiv
+# Ein Druck auf Super sprang dadurch auf tty1; der dortige Login-Prompt
+# meldete "authentication failure", waehrend der Desktop unsichtbar
+# weiterlief. XF86LaunchA hat dagegen keinen einzigen Treffer in
+# xkb/compat/ und ist damit unbelegt.
 
 set -e
 
@@ -38,8 +49,19 @@ pkill -u "$(id -u)" -x xcape 2>/dev/null || true
 # sonst ueberschreibt xfsettingsd die Bindung direkt wieder.
 sleep 2
 
-# Super_L allein -> Ctrl+Alt+F1 (in xfconf auf das Whisker-Menue gelegt).
-exec xcape -e 'Super_L=Control_L|Alt_L|F1' -t 200
+# Super_L allein -> XF86LaunchA (in xfconf auf das Whisker-Menue gelegt).
+# Das Keysym muss auf einem freien Keycode liegen, damit xcape es senden
+# kann; X11 vergibt dafuer standardmaessig keinen.
+if command -v xmodmap >/dev/null 2>&1; then
+    # Freien Keycode oberhalb der belegten Bereiche waehlen.
+    for kc in 248 247 246 245; do
+        if [ -z "$(xmodmap -pke 2>/dev/null | awk -v k="$kc" '$2==k {print $4}')" ]; then
+            xmodmap -e "keycode $kc = XF86LaunchA" 2>/dev/null && break
+        fi
+    done
+fi
+
+exec xcape -e 'Super_L=XF86LaunchA' -t 200
 EOF
 chmod 0755 /usr/local/bin/viperos-superkey
 

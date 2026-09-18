@@ -157,6 +157,8 @@ gparted
 htop
 # neofetch existiert in Trixie nicht mehr (upstream unmaintained) -> fastfetch
 fastfetch
+# lspci: der ViperOS Hub liest darueber das Grafikmodell aus.
+pciutils
 keepassxc
 file-roller
 zip
