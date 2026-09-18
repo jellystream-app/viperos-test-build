@@ -67,22 +67,40 @@ secondary-color='#4a5769'
 [org/gnome/settings-daemon/plugins/power]
 sleep-inactive-ac-type='nothing'
 
-[org/gnome/shell]
-# Der Anmeldebildschirm laedt keine Erweiterungen des Benutzers.
-enabled-extensions=[]
+# Hinweis: Hier stand "enabled-extensions=[]". Eine leere Liste ohne
+# Typangabe kann dconf nicht zuordnen:
+#   error: enabled-extensions: invalid value: []: unable to infer type
+# dconf compile bricht dann ab -> generate-config scheitert als
+# ExecStartPre -> "Failed to start gdm.service". Die richtige Schreibweise
+# waere @as [] - der Eintrag ist aber ohnehin unnoetig, weil der
+# Anmeldebildschirm die Erweiterungen des Benutzers gar nicht laedt.
 EOF
 
-# Die Datei wird beim GDM-Start automatisch kompiliert. Im Chroot laesst
-# sich das vorwegnehmen, damit die Datenbank schon im Image liegt.
-if command -v dconf >/dev/null 2>&1 && [ -d /usr/share/gdm/dconf ]; then
-    mkdir -p /var/lib/gdm3
-    if dconf compile /var/lib/gdm3/greeter-dconf-defaults /usr/share/gdm/dconf 2>/dev/null; then
-        echo "  greeter-dconf-defaults vorkompiliert ($(stat -c%s /var/lib/gdm3/greeter-dconf-defaults) Bytes)"
-        chown Debian-gdm:Debian-gdm /var/lib/gdm3/greeter-dconf-defaults 2>/dev/null || true
-    else
-        echo "  (Vorkompilierung uebersprungen - generate-config macht es beim Start)"
-    fi
-fi
+# ----------------------------------------------------------------------
+# NICHT vorkompilieren!
+#
+# Frueher stand hier ein "dconf compile /var/lib/gdm3/greeter-dconf-defaults".
+# Das hat GDM am Start gehindert - "Failed to start gdm.service":
+#
+#   1. Der Hook legte die Datei als root:root an.
+#   2. generate-config laeuft als ExecStartPre der gdm.service und ruft
+#      "as_gdm dconf compile ..." auf - also ALS BENUTZER Debian-gdm
+#      (setpriv --reuid Debian-gdm).
+#   3. Debian-gdm darf eine root-Datei nicht ersetzen: dconf schreibt
+#      zuerst eine temporaere Datei und benennt sie um - das scheitert mit
+#      "Permission denied".
+#   4. Faellt ExecStartPre durch, startet der Dienst nicht.
+#
+# generate-config baut die Datenbank ohnehin bei jedem Start neu und legt
+# das Verzeichnis dabei selbst korrekt an:
+#   install -m711 -oDebian-gdm -gDebian-gdm -d /var/lib/gdm3
+# Es genuegt also, /etc/gdm3/greeter.dconf-defaults zu schreiben - das ist
+# als /usr/share/gdm/dconf/90-debian-settings verlinkt und wird
+# automatisch mitkompiliert.
+#
+# Sicherheitshalber ein eventuell vorhandenes Ueberbleibsel entfernen,
+# damit ein aelteres Image nicht denselben Fehler behaelt.
+rm -f /var/lib/gdm3/greeter-dconf-defaults 2>/dev/null || true
 
 # ----------------------------------------------------------------------
 # Das ViperOS-Shell-Theme auch auf dem Anmeldebildschirm verwenden.
