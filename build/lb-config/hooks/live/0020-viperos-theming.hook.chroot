@@ -34,23 +34,38 @@ stage {
   color: #e7eef9;
 }
 
-/* ---------- Obere Leiste ---------- */
+/* ---------- Obere Leiste ----------
+   Schwebend statt randlos: Fedora und Standard-GNOME ziehen die Leiste
+   ueber die volle Breite bis an die Bildschirmkante. Hier sitzt sie mit
+   Abstand und abgerundeten Ecken - der auffaelligste Unterschied beim
+   ersten Blick.                                                        */
 #panel {
-  background-color: rgba(18, 21, 31, 0.82);
+  background-color: rgba(18, 21, 31, 0.88);
   font-weight: 600;
-  height: 34px;
-  border-bottom: 1px solid rgba(106, 143, 216, 0.16);
+  height: 36px;
+  margin: 6px 8px 0 8px;
+  border-radius: 14px;
+  border: 1px solid rgba(106, 143, 216, 0.18);
 }
 
 #panel:overview {
-  background-color: rgba(18, 21, 31, 0.55);
+  background-color: rgba(18, 21, 31, 0.45);
+  border-color: rgba(106, 143, 216, 0.10);
+}
+
+/* Die Ecken, die GNOME normalerweise unten an der Leiste zeichnet,
+   stoeren bei einer schwebenden Leiste. */
+#panel .panel-corner {
+  -panel-corner-radius: 0;
+  -panel-corner-background-color: transparent;
+  -panel-corner-border-color: transparent;
 }
 
 #panel .panel-button {
   color: #d4dff0;
-  border-radius: 9px;
-  margin: 3px 2px;
-  padding: 0 10px;
+  border-radius: 10px;
+  margin: 4px 2px;
+  padding: 0 11px;
   transition-duration: 150ms;
 }
 
@@ -256,12 +271,24 @@ stage {
   background-color: #6a8fd8;
 }
 
-/* ---------- Dash ---------- */
+/* ---------- Dash / Dock ----------
+   Stark abgerundet und schwebend - zusammen mit der Topbar ergibt das
+   eine erkennbar eigene Silhouette statt der GNOME-Standardform.      */
 #dash {
-  background-color: rgba(27, 31, 46, 0.72);
-  border: 1px solid rgba(106, 143, 216, 0.16);
-  border-radius: 20px;
-  padding: 6px;
+  background-color: rgba(18, 21, 31, 0.62);
+  border: 1px solid rgba(106, 143, 216, 0.18);
+  border-radius: 22px;
+  padding: 7px;
+  margin-bottom: 10px;
+}
+
+/* dash-to-dock nutzt eigene Klassen; gleiche Form auch dort. */
+#dashtodockContainer .dash-background,
+#dashtodockContainer #dash {
+  background-color: rgba(18, 21, 31, 0.62);
+  border: 1px solid rgba(106, 143, 216, 0.18);
+  border-radius: 22px;
+  padding: 7px;
 }
 
 #dash .placeholder {

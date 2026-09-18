@@ -65,10 +65,13 @@ primary-color='#20232c'
 secondary-color='#4a5769'
 
 [org/gnome/desktop/wm/preferences]
-# Fensterknoepfe rechts, Titelleiste kompakt
-button-layout='appmenu:minimize,maximize,close'
-titlebar-font='Inter Bold 11'
+# Fensterknoepfe LINKS wie bei macOS - der sichtbarste Unterschied zu
+# Fedora/Standard-GNOME, wo sie rechts sitzen.
+button-layout='close,minimize,maximize:appmenu'
+titlebar-font='Inter SemiBold 11'
 focus-mode='click'
+action-double-click-titlebar='toggle-maximize'
+num-workspaces=4
 
 # ============================================================
 # Erweiterungen
@@ -86,25 +89,42 @@ welcome-dialog-last-shown-version='48.0'
 name='ViperOS'
 
 [org/gnome/shell/extensions/dash-to-dock]
+# Schwebendes Dock am unteren Rand, nicht randlos ueber die ganze Breite.
+# Fedora zeigt das Dash nur in der Uebersicht; hier ist es dauerhaft da,
+# zentriert und abgerundet - das praegt den ersten Eindruck am staerksten.
 dock-position='BOTTOM'
 extend-height=false
 dock-fixed=false
 autohide=true
 intellihide=true
 intellihide-mode='FOCUS_APPLICATION_WINDOWS'
-transparency-mode='DYNAMIC'
-background-opacity=0.4
+require-pressure-to-show=true
+animation-time=0.18
+hide-delay=0.2
+show-delay=0.15
+transparency-mode='FIXED'
+background-opacity=0.55
 custom-background-color=true
-background-color='#1b1f2e'
+background-color='#12151f'
+# Punkte unter laufenden Anwendungen statt Striche
 running-indicator-style='DOTS'
-show-apps-at-top=false
+custom-theme-customize-running-dots=true
+custom-theme-running-dots-color='#6a8fd8'
+show-apps-at-top=true
+show-show-apps-button=true
 show-trash=false
 show-mounts=false
+show-favorites=true
+isolate-workspaces=false
 click-action='minimize-or-previews'
 scroll-action='cycle-windows'
-dash-max-icon-size=44
+dash-max-icon-size=46
+icon-size-fixed=true
 custom-theme-shrink=true
 apply-custom-theme=false
+# Abstand zum Bildschirmrand, damit es wirklich schwebt
+customize-alphes=true
+height-fraction=0.9
 
 [org/gnome/shell/extensions/blur-my-shell]
 hacks-level=1
