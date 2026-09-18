@@ -57,6 +57,13 @@ xfce4-clipman-plugin
 xfce4-pulseaudio-plugin
 xfce4-systemload-plugin
 xfce4-netload-plugin
+# Liefert libxfce4powermanager.so fuer das Panel-Plugin "power-manager-plugin".
+# Nur als Recommends von xfce4-power-manager verknuepft und faellt deshalb
+# mit --apt-recommends false weg - ohne dieses Paket fehlt das Plugin und
+# die Panel-Leiste kann beim Laden abbrechen.
+xfce4-power-manager-plugins
+# Bindet die allein gedrueckte Windows-Taste (Super_L); siehe Hook 0022.
+xcape
 xfwm4
 xfdesktop4
 thunar

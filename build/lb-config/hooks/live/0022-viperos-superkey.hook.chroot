@@ -1,0 +1,59 @@
+#!/bin/bash
+# ViperosOS - Windows-Taste (Super) oeffnet das Whisker-Menue
+#
+# Warum ein eigener Hook noetig ist:
+# Super_L ist in X11 ein MODIFIER, kein normaler Tastendruck. Modifier
+# erzeugen keine Accelerator-Events, deshalb kann xfconf sie nicht binden -
+# ein Eintrag "Super_L" in xfce4-keyboard-shortcuts.xml bleibt wirkungslos.
+#
+# Loesung: xcape lauscht auf ein ALLEIN gedruecktes Super_L (ohne weitere
+# Taste) und sendet dann Ctrl+Alt+F1. Genau dieses Kuerzel ist in
+# xfce4-keyboard-shortcuts.xml auf xfce4-popup-whiskermenu gelegt.
+# Super in Kombination (Super+E, Super+T) funktioniert davon unabhaengig
+# weiterhin als normaler Modifier.
+
+set -e
+
+echo "[ViperosOS] Richte Super-Taste ein..."
+
+# xcape ist klein (~30 KB) und in Trixie verfuegbar.
+export DEBIAN_FRONTEND=noninteractive
+apt-get install -y --no-install-recommends xcape
+
+mkdir -p /usr/local/bin /etc/xdg/autostart
+
+cat > /usr/local/bin/viperos-superkey << 'EOF'
+#!/bin/sh
+# Bindet die allein gedrueckte Windows-Taste an das Whisker-Menue.
+set -eu
+
+# Nur unter X11 sinnvoll; unter Wayland gibt es kein XTEST.
+[ -n "${DISPLAY:-}" ] || exit 0
+command -v xcape >/dev/null 2>&1 || exit 0
+
+# Doppelstart vermeiden, falls die Session neu geladen wird.
+pkill -u "$(id -u)" -x xcape 2>/dev/null || true
+
+# Kurze Wartezeit: xfsettingsd/xfwm4 muessen ihre Keymap gesetzt haben,
+# sonst ueberschreibt xfsettingsd die Bindung direkt wieder.
+sleep 2
+
+# Super_L allein -> Ctrl+Alt+F1 (in xfconf auf das Whisker-Menue gelegt).
+exec xcape -e 'Super_L=Control_L|Alt_L|F1' -t 200
+EOF
+chmod 0755 /usr/local/bin/viperos-superkey
+
+cat > /etc/xdg/autostart/viperos-superkey.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=ViperOS Super Key
+Comment=Windows-Taste oeffnet das Anwendungsmenue
+Exec=/usr/local/bin/viperos-superkey
+Icon=input-keyboard
+Terminal=false
+NoDisplay=true
+OnlyShowIn=XFCE;
+X-GNOME-Autostart-enabled=true
+EOF
+
+echo "[ViperosOS] Super-Taste eingerichtet (xcape -> Ctrl+Alt+F1 -> Whisker)."

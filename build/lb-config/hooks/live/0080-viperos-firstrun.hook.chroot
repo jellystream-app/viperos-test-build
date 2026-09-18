@@ -24,12 +24,7 @@ OnlyShowIn=XFCE;
 X-GNOME-Autostart-enabled=true
 EOF
 
-cat > /etc/xdg/autostart/nm-applet.desktop << 'EOF'
-[Desktop Entry]
-Type=Application
-Name=Network
-Exec=nm-applet --sm-disable
-Icon=network-wireless
-Terminal=false
-X-GNOME-Autostart-enabled=true
-EOF
+# nm-applet wird ausschliesslich in 0050-viperos-networkmanager geschrieben.
+# Frueher stand hier eine zweite, abweichende Fassung, die den dortigen
+# Eintrag ueberschrieben hat (dieser Hook laeuft spaeter). Nicht wieder
+# aufnehmen - sonst kehrt das fehlende Netzwerk-Symbol zurueck.

@@ -10,41 +10,96 @@ echo "[ViperosOS] Erstelle Branding-Assets..."
 mkdir -p /usr/share/viperos
 
 # --------------------------------------------------------
-# HD Dark Glass Wallpaper via Python PIL/ImageMagick
+# Dark-Glass Wallpaper in 4K
+#
+# Vorher 1920x1080: auf 1440p- und 4K-Panels sichtbar hochskaliert und
+# dadurch unscharf. 3840x2160 deckt alle gaengigen Aufloesungen ab und wird
+# nach unten sauber skaliert. Der Farbverlauf wird zusaetzlich leicht
+# gedithert, damit auf grossen Flaechen kein Banding entsteht.
 # --------------------------------------------------------
-python3 -c "
-import math
-try:
-    from PIL import Image, ImageDraw
-    img = Image.new('RGB', (1920, 1080), (10, 15, 26))
-    draw = ImageDraw.Draw(img)
-    # Radial dark blue / glass gradient
-    for y in range(1080):
-        r = int(10 + (22 - 10) * (y / 1080))
-        g = int(15 + (45 - 15) * (y / 1080))
-        b = int(26 + (75 - 26) * (y / 1080))
-        draw.line([(0, y), (1920, y)], fill=(r, g, b))
-    # Accent geometric lines
-    draw.polygon([(0, 1080), (1920, 700), (1920, 1080)], fill=(16, 28, 50))
-    draw.polygon([(0, 1080), (1200, 1080), (0, 400)], fill=(14, 38, 70))
-    img.save('/usr/share/viperos/wallpaper.png')
-    
-    # User Icon
-    icon = Image.new('RGB', (96, 96), (0, 132, 255))
-    idraw = ImageDraw.Draw(icon)
-    idraw.rectangle([8, 8, 88, 88], outline=(255, 255, 255), width=3)
-    icon.save('/usr/share/viperos/user-icon.png')
-    icon.save('/usr/share/pixmaps/viperos.png')
-    icon.save('/usr/share/calamares/branding/viperos/viperos-icon.png')
-    icon.save('/usr/share/calamares/branding/viperos/viperos-logo.png')
-    print('HD Wallpaper via Python PIL erstellt.')
-except Exception as e:
-    print('Fallback minimal wallpaper:', e)
-    with open('/usr/share/viperos/wallpaper.png', 'wb') as f:
-        f.write(b'')
-" 2>/dev/null || true
+mkdir -p /usr/share/pixmaps /usr/share/calamares/branding/viperos /usr/share/icons/hicolor/scalable/apps
 
-# Symlink für Fallback
+python3 << 'PYEOF' || echo "[ViperosOS] WARNUNG: Wallpaper-Erzeugung fehlgeschlagen"
+import random
+from PIL import Image, ImageDraw
+
+W, H = 3840, 2160
+img = Image.new('RGB', (W, H), (10, 15, 26))
+draw = ImageDraw.Draw(img)
+
+# Vertikaler Verlauf #0a0f1a -> #162b4b, pro Zeile leicht gedithert
+random.seed(1)
+for y in range(H):
+    t = y / H
+    r = 10 + (22 - 10) * t
+    g = 15 + (43 - 15) * t
+    b = 26 + (75 - 26) * t
+    d = random.uniform(-0.6, 0.6)
+    draw.line([(0, y), (W, y)],
+              fill=(max(0, min(255, int(r + d))),
+                    max(0, min(255, int(g + d))),
+                    max(0, min(255, int(b + d)))))
+
+# Geometrische Akzentflaechen (Koordinaten auf 4K skaliert)
+draw.polygon([(0, H), (W, int(H * 0.648)), (W, H)], fill=(16, 28, 50))
+draw.polygon([(0, H), (int(W * 0.625), H), (0, int(H * 0.37))], fill=(14, 38, 70))
+
+img.save('/usr/share/viperos/wallpaper.png', optimize=True)
+print('Wallpaper 3840x2160 erstellt.')
+PYEOF
+
+# --------------------------------------------------------
+# Logo als SVG: skaliert verlustfrei auf jede Groesse, anders als die
+# frueheren 96x96-PNGs (die auf HiDPI grob wirkten).
+# --------------------------------------------------------
+cat > /usr/share/icons/hicolor/scalable/apps/viperos.svg << 'SVGEOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#101827"/>
+      <stop offset="1" stop-color="#16233a"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="34" fill="url(#bg)"/>
+  <rect x="22" y="22" width="148" height="148" rx="28"
+        fill="none" stroke="#55a5f7" stroke-width="8"/>
+  <path d="M62 68 L96 132 L134 68" fill="none" stroke="#e7eef9"
+        stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+SVGEOF
+
+# PNG-Ableitungen fuer Stellen, die kein SVG lesen (LightDM-Benutzerbild,
+# Calamares-Branding). Aus dem SVG gerendert, daher in jeder Groesse scharf.
+python3 << 'PYEOF' || echo "[ViperosOS] WARNUNG: Icon-Erzeugung fehlgeschlagen"
+from PIL import Image, ImageDraw
+
+def logo(size):
+    s = size / 192.0
+    img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle((0, 0, size - 1, size - 1), radius=int(34 * s), fill=(16, 24, 39, 255))
+    d.rounded_rectangle((int(22 * s), int(22 * s), int(170 * s), int(170 * s)),
+                        radius=int(28 * s), outline=(85, 165, 247, 255),
+                        width=max(2, int(8 * s)))
+    d.line((int(62 * s), int(68 * s), int(96 * s), int(132 * s), int(134 * s), int(68 * s)),
+           fill=(231, 238, 249, 255), width=max(3, int(11 * s)), joint='curve')
+    return img
+
+# Grosse Quelle rendern und herunterskalieren: ergibt weiche Kanten
+# statt der harten Treppen der frueheren Direktzeichnung.
+base = logo(768)
+for path, size in [
+    ('/usr/share/viperos/user-icon.png', 256),
+    ('/usr/share/pixmaps/viperos.png', 256),
+    ('/usr/share/calamares/branding/viperos/viperos-icon.png', 256),
+    ('/usr/share/calamares/branding/viperos/viperos-logo.png', 512),
+]:
+    base.resize((size, size), Image.LANCZOS).save(path, optimize=True)
+print('Logos aus 768px-Quelle gerendert.')
+PYEOF
+
+# wallpaper.jpg wird von lightdm-gtk-greeter.conf referenziert.
 ln -sf /usr/share/viperos/wallpaper.png /usr/share/viperos/wallpaper.jpg 2>/dev/null || true
 
 # --------------------------------------------------------

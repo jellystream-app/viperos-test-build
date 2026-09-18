@@ -1,0 +1,78 @@
+#!/bin/bash
+# ViperosOS - Hintergrundbild fuer den tatsaechlich erkannten Monitor setzen
+#
+# Warum das noetig ist:
+# xfdesktop speichert den Hintergrund unter einem xfconf-Pfad, der den
+# NAMEN des Ausgangs enthaelt - z. B.
+#   /backdrop/screen0/monitoreDP-1/workspace0/last-image
+# Welcher Name das ist, steht erst zur Laufzeit fest (eDP-1, HDMI-1,
+# HDMI-A-1, DP-1, Virtual-1, VGA-1 ...). In der mitgelieferten
+# xfce4-desktop.xml sind die gaengigen Namen hinterlegt, aber eben nicht
+# alle. Passt keiner, bleibt der Desktop grau.
+#
+# Dieses Skript laeuft beim Sessionstart, fragt xfconf nach den real
+# vorhandenen Monitor-Pfaden und setzt den Hintergrund genau dort.
+
+set -e
+
+echo "[ViperosOS] Richte Wallpaper-Autostart ein..."
+
+mkdir -p /usr/local/bin /etc/xdg/autostart
+
+cat > /usr/local/bin/viperos-set-wallpaper << 'EOF'
+#!/bin/sh
+# Setzt das ViperOS-Wallpaper auf allen erkannten Monitoren.
+set -u
+
+WALLPAPER=/usr/share/viperos/wallpaper.png
+[ -f "$WALLPAPER" ] || exit 0
+[ -n "${DISPLAY:-}" ] || exit 0
+command -v xfconf-query >/dev/null 2>&1 || exit 0
+
+# Auf xfdesktop warten - vorher existieren die backdrop-Pfade nicht.
+i=0
+while [ "$i" -lt 15 ]; do
+    xfconf-query -c xfce4-desktop -l >/dev/null 2>&1 && break
+    i=$((i + 1))
+    sleep 1
+done
+
+# Alle vorhandenen backdrop-Pfade einsammeln und setzen.
+found=0
+for prop in $(xfconf-query -c xfce4-desktop -l 2>/dev/null | grep -E '/backdrop/screen[0-9]+/monitor.*/workspace[0-9]+/(last-image|image-path)$'); do
+    xfconf-query -c xfce4-desktop -p "$prop" -s "$WALLPAPER" 2>/dev/null && found=1
+done
+
+# Kein Pfad vorhanden (frisches Profil): fuer jeden von xrandr gemeldeten
+# verbundenen Ausgang selbst anlegen.
+if [ "$found" -eq 0 ] && command -v xrandr >/dev/null 2>&1; then
+    for out in $(xrandr --query 2>/dev/null | awk '/ connected/{print $1}'); do
+        for ws in 0 1 2 3; do
+            base="/backdrop/screen0/monitor${out}/workspace${ws}"
+            xfconf-query -c xfce4-desktop -p "${base}/last-image" -n -t string -s "$WALLPAPER" 2>/dev/null || \
+            xfconf-query -c xfce4-desktop -p "${base}/last-image" -s "$WALLPAPER" 2>/dev/null || true
+            xfconf-query -c xfce4-desktop -p "${base}/image-style" -n -t int -s 5 2>/dev/null || true
+        done
+    done
+fi
+
+# xfdesktop neu zeichnen lassen.
+command -v xfdesktop >/dev/null 2>&1 && xfdesktop --reload 2>/dev/null || true
+exit 0
+EOF
+chmod 0755 /usr/local/bin/viperos-set-wallpaper
+
+cat > /etc/xdg/autostart/viperos-wallpaper.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=ViperOS Wallpaper
+Comment=Hintergrundbild fuer den erkannten Monitor setzen
+Exec=/usr/local/bin/viperos-set-wallpaper
+Icon=preferences-desktop-wallpaper
+Terminal=false
+NoDisplay=true
+OnlyShowIn=XFCE;
+X-GNOME-Autostart-enabled=true
+EOF
+
+echo "[ViperosOS] Wallpaper-Autostart eingerichtet."

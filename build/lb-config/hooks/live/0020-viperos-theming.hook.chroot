@@ -14,21 +14,64 @@ for USER_DIR in /home/viperos /etc/skel; do
     # 1. XFCE4 Desktop Einstellungen
     cat > "${USER_DIR}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml" << 'XFCEEOF'
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Monitor-Namen sind NICHT vorhersagbar: xfdesktop legt den xfconf-Pfad nach
+  dem tatsaechlichen Ausgang an (monitoreDP-1, monitorVirtual-1, monitorLVDS-1,
+  monitorHDMI-1 ...). Ein fest verdrahteter Name greift nur auf genau dieser
+  Hardware; sonst bleibt der Hintergrund grau. Deshalb sind hier die
+  gaengigsten Ausgaenge hinterlegt, und 0085-viperos-wallpaper setzt den
+  Hintergrund beim Sessionstart zusaetzlich fuer den real erkannten Monitor.
+-->
 <channel name="xfce4-desktop" version="1.0">
   <property name="backdrop" type="empty">
     <property name="screen0" type="empty">
-      <property name="monitorHDMI-1" type="empty">
-        <property name="workspace0" type="empty">
-          <property name="color-style" type="int" value="0"/>
-          <property name="image-style" type="int" value="5"/>
-          <property name="image-path" type="string" value="/usr/share/viperos/wallpaper.png"/>
-        </property>
-      </property>
       <property name="monitor0" type="empty">
         <property name="workspace0" type="empty">
           <property name="color-style" type="int" value="0"/>
           <property name="image-style" type="int" value="5"/>
-          <property name="image-path" type="string" value="/usr/share/viperos/wallpaper.png"/>
+          <property name="last-image" type="string" value="/usr/share/viperos/wallpaper.png"/>
+        </property>
+      </property>
+      <property name="monitorHDMI-1" type="empty">
+        <property name="workspace0" type="empty">
+          <property name="color-style" type="int" value="0"/>
+          <property name="image-style" type="int" value="5"/>
+          <property name="last-image" type="string" value="/usr/share/viperos/wallpaper.png"/>
+        </property>
+      </property>
+      <property name="monitorHDMI-A-1" type="empty">
+        <property name="workspace0" type="empty">
+          <property name="color-style" type="int" value="0"/>
+          <property name="image-style" type="int" value="5"/>
+          <property name="last-image" type="string" value="/usr/share/viperos/wallpaper.png"/>
+        </property>
+      </property>
+      <property name="monitoreDP-1" type="empty">
+        <property name="workspace0" type="empty">
+          <property name="color-style" type="int" value="0"/>
+          <property name="image-style" type="int" value="5"/>
+          <property name="last-image" type="string" value="/usr/share/viperos/wallpaper.png"/>
+        </property>
+      </property>
+      <property name="monitorDP-1" type="empty">
+        <property name="workspace0" type="empty">
+          <property name="color-style" type="int" value="0"/>
+          <property name="image-style" type="int" value="5"/>
+          <property name="last-image" type="string" value="/usr/share/viperos/wallpaper.png"/>
+        </property>
+      </property>
+      <property name="monitorVirtual-1" type="empty">
+        <property name="workspace0" type="empty">
+          <property name="color-style" type="int" value="0"/>
+          <property name="image-style" type="int" value="5"/>
+          <property name="last-image" type="string" value="/usr/share/viperos/wallpaper.png"/>
+        </property>
+      </property>
+      <property name="monitorVGA-1" type="empty">
+        <property name="workspace0" type="empty">
+          <property name="color-style" type="int" value="0"/>
+          <property name="image-style" type="int" value="5"/>
+          <property name="last-image" type="string" value="/usr/share/viperos/wallpaper.png"/>
         </property>
       </property>
     </property>
@@ -82,45 +125,68 @@ XSETEOF
     # 4. Modern Linux Topbar (Transparente XFCE-Panel Leiste oben + Whisker App-Menü & Taskleiste)
     cat > "${USER_DIR}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml" << 'PANELEOF'
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  WICHTIG: panel-1 MUSS innerhalb von <property name="panels"> liegen.
+  xfconf-Pfade sind hierarchisch: verschachtelt entsteht /panels/panel-1/...,
+  auf Top-Level dagegen /panel-1/... - Letzteres liest xfce4-panel nicht,
+  die Leiste bleibt dann komplett unsichtbar.
+  Referenz: /etc/xdg/xfce4/panel/default.xml aus dem Paket xfce4-panel.
+-->
 <channel name="xfce4-panel" version="1.0">
   <property name="configver" type="int" value="2"/>
   <property name="panels" type="array">
     <value type="int" value="1"/>
-  </property>
-  <property name="panel-1" type="empty">
-    <property name="position" type="string" value="p=6;x=0;y=0"/>
-    <property name="length" type="double" value="100"/>
-    <property name="length-type" type="uint" value="0"/>
-    <property name="position-locked" type="bool" value="true"/>
-    <property name="size" type="uint" value="34"/>
-    <property name="background-style" type="uint" value="1"/>
-    <property name="background-rgba" type="array">
-      <value type="double" value="0.06"/>
-      <value type="double" value="0.09"/>
-      <value type="double" value="0.16"/>
-      <value type="double" value="0.85"/>
-    </property>
-    <property name="plugin-ids" type="array">
-      <value type="int" value="1"/>
-      <value type="int" value="2"/>
-      <value type="int" value="3"/>
-      <value type="int" value="4"/>
-      <value type="int" value="5"/>
-      <value type="int" value="6"/>
-      <value type="int" value="7"/>
-      <value type="int" value="8"/>
-      <value type="int" value="9"/>
+    <property name="dark-mode" type="bool" value="true"/>
+    <property name="panel-1" type="empty">
+      <property name="position" type="string" value="p=6;x=0;y=0"/>
+      <property name="length" type="uint" value="100"/>
+      <property name="length-adjust" type="bool" value="true"/>
+      <property name="position-locked" type="bool" value="true"/>
+      <property name="icon-size" type="uint" value="16"/>
+      <property name="size" type="uint" value="34"/>
+      <property name="background-style" type="uint" value="1"/>
+      <property name="background-rgba" type="array">
+        <value type="double" value="0.06"/>
+        <value type="double" value="0.09"/>
+        <value type="double" value="0.16"/>
+        <value type="double" value="0.85"/>
+      </property>
+      <property name="plugin-ids" type="array">
+        <value type="int" value="1"/>
+        <value type="int" value="2"/>
+        <value type="int" value="3"/>
+        <value type="int" value="4"/>
+        <value type="int" value="5"/>
+        <value type="int" value="6"/>
+        <value type="int" value="7"/>
+        <value type="int" value="8"/>
+        <value type="int" value="9"/>
+      </property>
     </property>
   </property>
   <property name="plugins" type="empty">
     <property name="plugin-1" type="string" value="whiskermenu"/>
-    <property name="plugin-2" type="string" value="separator"/>
-    <property name="plugin-3" type="string" value="tasklist"/>
-    <property name="plugin-4" type="string" value="separator"/>
-    <property name="plugin-5" type="string" value="systray"/>
+    <property name="plugin-2" type="string" value="separator">
+      <property name="expand" type="bool" value="false"/>
+      <property name="style" type="uint" value="0"/>
+    </property>
+    <property name="plugin-3" type="string" value="tasklist">
+      <property name="grouping" type="uint" value="1"/>
+    </property>
+    <property name="plugin-4" type="string" value="separator">
+      <property name="expand" type="bool" value="true"/>
+      <property name="style" type="uint" value="0"/>
+    </property>
+    <property name="plugin-5" type="string" value="systray">
+      <property name="square-icons" type="bool" value="true"/>
+    </property>
     <property name="plugin-6" type="string" value="pulseaudio"/>
     <property name="plugin-7" type="string" value="power-manager-plugin"/>
-    <property name="plugin-8" type="string" value="clock"/>
+    <property name="plugin-8" type="string" value="clock">
+      <property name="digital-layout" type="uint" value="3"/>
+      <property name="digital-time-format" type="string" value="%H:%M"/>
+      <property name="digital-date-format" type="string" value="%d.%m.%Y"/>
+    </property>
     <property name="plugin-9" type="string" value="actions"/>
   </property>
 </channel>
@@ -141,13 +207,21 @@ WHISKEREOF
     # 6. Keyboard Shortcuts (Windows-Taste -> Whisker Menu / App-Suche, Super+Space, Ctrl+Alt+T)
     cat > "${USER_DIR}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-keyboard-shortcuts.xml" << 'KEYEOF'
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Die Windows-Taste allein (Super_L) ist ein reiner MODIFIER. X11 liefert
+  dafuer kein Accelerator-Event, deshalb kann xfconf sie nicht binden -
+  "Super_L" und "<Super>" hier einzutragen bleibt wirkungslos.
+  Gebunden wird sie stattdessen von xcape (siehe 0022-viperos-superkey),
+  das ein allein gedruecktes Super_L in Ctrl+Alt+F1 uebersetzt; dieses
+  Kuerzel ruft hier das Whisker-Menue auf.
+-->
 <channel name="xfce4-keyboard-shortcuts" version="1.0">
   <property name="commands" type="empty">
     <property name="custom" type="empty">
-      <property name="&lt;Super&gt;" type="string" value="xfce4-popup-whiskermenu"/>
-      <property name="Super_L" type="string" value="xfce4-popup-whiskermenu"/>
+      <property name="override" type="bool" value="true"/>
+      <property name="&lt;Primary&gt;&lt;Alt&gt;F1" type="string" value="xfce4-popup-whiskermenu"/>
       <property name="&lt;Super&gt;space" type="string" value="xfce4-appfinder"/>
-      <property name="&lt;Control&gt;&lt;Alt&gt;t" type="string" value="xfce4-terminal"/>
+      <property name="&lt;Primary&gt;&lt;Alt&gt;t" type="string" value="xfce4-terminal"/>
       <property name="&lt;Super&gt;e" type="string" value="thunar"/>
       <property name="&lt;Super&gt;t" type="string" value="xfce4-terminal"/>
     </property>
@@ -180,6 +254,35 @@ done
 
 echo "[ViperosOS] Desktop-Theme & Topbar erfolgreich konfiguriert."
 
-# System-weites Fallback Panel für XFCE
+# ================================================================
+# Systemweite XFCE-Konfiguration unter /etc/xdg/
+# XFCE liest beim Login ZUERST /etc/xdg/xfce4/ und DANN ~/.config/xfce4/
+# Im Live-Modus existiert ~/.config/ oft noch nicht wenn XFCE startet,
+# deshalb MUSS die Config hier liegen damit Panel, Theme und Shortcuts
+# beim ersten Boot sofort korrekt geladen werden.
+# ================================================================
+
+echo "[ViperosOS] Kopiere Konfiguration nach /etc/xdg/xfce4/ (systemweit)..."
+
+# Alle XFCE xfconf XML-Dateien systemweit ablegen
+mkdir -p /etc/xdg/xfce4/xfconf/xfce-perchannel-xml
+for f in xfce4-panel.xml xfwm4.xml xsettings.xml xfce4-desktop.xml xfce4-keyboard-shortcuts.xml; do
+    if [ -f "/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/${f}" ]; then
+        cp "/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/${f}" \
+           "/etc/xdg/xfce4/xfconf/xfce-perchannel-xml/${f}"
+        echo "  -> ${f} kopiert"
+    fi
+done
+
+# Whisker-Menu Config systemweit
 mkdir -p /etc/xdg/xfce4/panel
-cp /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml /etc/xdg/xfce4/panel/default.xml 2>/dev/null || true
+if [ -f /etc/skel/.config/xfce4/panel/whiskermenu-1.rc ]; then
+    cp /etc/skel/.config/xfce4/panel/whiskermenu-1.rc /etc/xdg/xfce4/panel/whiskermenu-1.rc
+    echo "  -> whiskermenu-1.rc kopiert"
+fi
+
+# Panel default.xml Fallback (manche XFCE-Versionen lesen das)
+cp /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml \
+   /etc/xdg/xfce4/panel/default.xml 2>/dev/null || true
+
+echo "[ViperosOS] Systemweite /etc/xdg/ Konfiguration abgeschlossen."

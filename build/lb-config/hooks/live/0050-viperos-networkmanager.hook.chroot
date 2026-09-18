@@ -1,21 +1,28 @@
 #!/bin/bash
 # ViperosOS - NetworkManager Konfiguration
+#
+# Warum die alte Fassung kein Netzwerk brachte:
+#   1. plugins=ifupdown,keyfile zusammen mit einer angelegten
+#      /etc/network/interfaces liess NetworkManager die Geraete dem
+#      ifupdown-Backend ueberlassen - das aber per "systemctl disable
+#      networking" abgeschaltet war. Ergebnis: niemand konfigurierte das
+#      Interface, also keine Verbindung.
+#   2. Der nm-applet-Autostart trug
+#      "AutostartCondition=GNOME3 unless-session gnome" - eine
+#      GNOME-spezifische Bedingung, die unter XFCE nicht greift. Deshalb
+#      erschien kein Netzwerk-Symbol im Systray.
 
 set -e
 
 echo "[ViperosOS] Konfiguriere NetworkManager..."
 
-# Verzeichnisse sicherstellen
-mkdir -p /etc/NetworkManager /etc/network/interfaces.d /etc/xdg/autostart
+mkdir -p /etc/NetworkManager/conf.d /etc/network/interfaces.d /etc/xdg/autostart
 
-# NetworkManager Hauptkonfiguration
+# Nur keyfile: NetworkManager verwaltet alle Geraete selbst.
 cat > /etc/NetworkManager/NetworkManager.conf << 'EOF'
 [main]
-plugins=ifupdown,keyfile
+plugins=keyfile
 dns=default
-
-[ifupdown]
-managed=true
 
 [device]
 wifi.scan-rand-mac-address=yes
@@ -24,34 +31,47 @@ wifi.scan-rand-mac-address=yes
 connection.stable-id=${CONNECTION}/${BOOT}
 EOF
 
-# Verhindere, dass ifupdown-Netzwerke von NM ignoriert werden
+# Ethernet und WLAN ausdruecklich als "managed" markieren. Debian legt
+# 10-globally-managed-devices.conf nur fuer einige Typen an; ohne diese
+# Datei koennen Geraete je nach Image als unmanaged gelten.
+cat > /etc/NetworkManager/conf.d/10-viperos-managed.conf << 'EOF'
+[keyfile]
+unmanaged-devices=none
+EOF
+
+# /etc/network/interfaces bewusst MINIMAL halten: steht hier ein Geraet,
+# beansprucht ifupdown es und NetworkManager laesst die Finger davon.
 cat > /etc/network/interfaces << 'EOF'
-# Diese Datei wird von NetworkManager verwaltet
-# Manuelle Änderungen können überschrieben werden
+# Netzwerkgeraete werden von NetworkManager verwaltet.
+# Hier absichtlich nur das Loopback-Interface eintragen - jeder weitere
+# Eintrag wuerde NetworkManager die Kontrolle ueber das Geraet entziehen.
 source /etc/network/interfaces.d/*
 
 auto lo
 iface lo inet loopback
 EOF
 
-# NetworkManager aktivieren
+# Dienste: NetworkManager an, ifupdown aus.
 systemctl enable NetworkManager 2>/dev/null || true
 systemctl disable networking 2>/dev/null || true
 
-# nm-applet Autostart
-mkdir -p /etc/xdg/autostart
+# NetworkManager-wait-online verzoegert den Boot bis zu 90 s, wenn kein
+# Kabel steckt. Fuer ein Live-System unerwuenscht.
+systemctl disable NetworkManager-wait-online 2>/dev/null || true
+
+# nm-applet: ohne GNOME-Bedingung, damit das Symbol unter XFCE erscheint.
 cat > /etc/xdg/autostart/nm-applet.desktop << 'EOF'
 [Desktop Entry]
 Type=Application
 Name=Network Manager Applet
 Comment=Netzwerkverbindungen verwalten
-Exec=nm-applet
+Exec=nm-applet --indicator
 Icon=network-wireless
 Terminal=false
-Categories=GNOME;GTK;System;Tray;
+Categories=System;TrayIcon;
 StartupNotify=false
-AutostartCondition=GNOME3 unless-session gnome
+NoDisplay=true
 X-GNOME-Autostart-enabled=true
 EOF
 
-echo "[ViperosOS] NetworkManager konfiguriert."
+echo "[ViperosOS] NetworkManager konfiguriert (keyfile-Plugin, nm-applet fuer XFCE)."
