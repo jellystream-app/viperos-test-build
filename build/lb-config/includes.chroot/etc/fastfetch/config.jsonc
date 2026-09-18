@@ -11,9 +11,17 @@
 {
   "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
 
+  // Die Platzhalter $1 $2 $3 im Logo sind Farbindizes. Ohne Angabe ist
+  // $1 ROT (ANSI 31) - das Logo erschien deshalb rot statt im
+  // ViperOS-Blau. Hier auf die Akzentfarben gesetzt.
   "logo": {
     "source": "/usr/share/viperos/logo.txt",
     "type": "file",
+    "color": {
+      "1": "blue",      // Aussenring
+      "2": "cyan",      // Innenkontur und Schriftzug
+      "3": "white"      // Kern
+    },
     "padding": {
       "top": 1,
       "right": 3

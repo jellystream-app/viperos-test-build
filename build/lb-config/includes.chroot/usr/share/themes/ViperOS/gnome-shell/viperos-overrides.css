@@ -28,26 +28,40 @@ stage {
 }
 
 /* ---------- Obere Leiste: schwebend ----------
-   Der auffaelligste Unterschied zu Standard-GNOME, wo die Leiste
-   randlos und rechteckig ueber die volle Breite laeuft.            */
+   WICHTIG: "margin" wirkt hier NICHT. Die Leiste wird von der Shell
+   selbst positioniert (Main.layoutManager.panelBox), und St wertet an
+   #panel weder margin noch eine Verschiebung per CSS aus - beides wird
+   stillschweigend verworfen. Genau deshalb blieb die Leiste zuvor steif
+   am Rand kleben und die Rundung war nicht zu sehen.
+
+   Den Abstand erzeugt die Erweiterung viperos-panel@viperos.os, die die
+   panelBox verschiebt und schmaler macht. Sie setzt dabei die Klasse
+   "viperos-floating" - nur dann sollen die runden Ecken gelten, damit
+   die Leiste ohne Erweiterung nicht halb abgeschnitten aussieht.      */
 #panel {
   background-color: rgba(18, 21, 31, 0.88);
   font-weight: 600;
   height: 2.3em;
-  margin: 6px 8px 0 8px;
-  border-radius: 15px;
-  border: 1px solid rgba(106, 143, 216, 0.20);
   transition-duration: 250ms;
+}
+
+#panel.viperos-floating {
+  border-radius: 16px;
+  border: 1px solid rgba(106, 143, 216, 0.22);
 }
 
 #panel:overview {
   background-color: rgba(18, 21, 31, 0.42);
+}
+
+#panel.viperos-floating:overview {
   border-color: rgba(106, 143, 216, 0.10);
 }
 
 /* Die Eckfuellungen, die GNOME unter die Leiste zeichnet, wuerden bei
-   einer schwebenden Leiste als graue Zipfel sichtbar bleiben. */
-#panel .panel-corner {
+   einer abgesetzten Leiste als graue Zipfel danebenstehen. */
+#panel .panel-corner,
+.panel-corner {
   -panel-corner-radius: 0;
   -panel-corner-background-color: transparent;
   -panel-corner-border-color: transparent;
@@ -83,6 +97,29 @@ stage {
 
 #panelLeft, #panelCenter, #panelRight {
   spacing: 2px;
+}
+
+/* Arbeitsflaechen-Anzeige links (ersetzt seit GNOME 47 die
+   "Aktivitaeten"-Schaltflaeche). Stand bisher im Standardweiss, weil
+   unsere CSS diese Klassen nicht ansprach - jetzt in der Akzentfarbe. */
+#panel .panel-button#panelActivities .workspace-dot {
+  background-color: rgba(142, 163, 192, 0.55);
+  border-radius: 999px;
+}
+
+#panel .panel-button#panelActivities .workspace-dot:active,
+#panel .panel-button#panelActivities .workspace-dot.active {
+  background-color: #6a8fd8;
+}
+
+#panel:overview .panel-button#panelActivities .workspace-dot {
+  background-color: rgba(231, 238, 249, 0.75);
+}
+
+/* Uhr in der Mitte etwas hervorheben */
+#panel .clock-display {
+  font-weight: 600;
+  color: #ffffff;
 }
 
 /* ---------- Popups und Menues ---------- */

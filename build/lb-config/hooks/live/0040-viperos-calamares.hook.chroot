@@ -79,11 +79,75 @@ Categories=System;Settings;
 Keywords=install;installer;setup;calamares;
 EOF
 
-# Desktop-Verknuepfung, damit der Installer in der Live-Sitzung sofort
-# sichtbar ist und nicht erst im Menue gesucht werden muss.
+# ----------------------------------------------------------------------
+# Debians eigenes Installer-Symbol unterdruecken
+#
+# calamares-settings-debian bringt zwei Dateien mit:
+#   /usr/share/applications/calamares-install-debian.desktop
+#   /etc/xdg/autostart/calamares-desktop-icon.desktop
+# Die zweite ruft beim Sitzungsstart "add-calamares-desktop-icon" auf und
+# legt damit ein Debian-Symbol auf den Schreibtisch. Genau das war im
+# Screenshot als "calamares-install-debian..." mit Debian-Spirale zu sehen.
+# ----------------------------------------------------------------------
+rm -f /etc/xdg/autostart/calamares-desktop-icon.desktop
+rm -f /usr/share/applications/calamares-install-debian.desktop
+# calamares.desktop selbst ausblenden - wir haben unseren eigenen Eintrag.
+if [ -f /usr/share/applications/calamares.desktop ]; then
+    printf 'NoDisplay=true\n' >> /usr/share/applications/calamares.desktop
+fi
+echo "  Debian-Installersymbol entfernt"
+
+# ----------------------------------------------------------------------
+# Desktop-Verknuepfung fuer den ViperOS-Installer
+#
+# Damit "Desktop Icons NG" (ding) sie ohne Warnzeichen anzeigt, braucht
+# es ZWEI Dinge: das Ausfuehrbar-Bit UND das Attribut metadata::trusted.
+# Fehlt Letzteres, malt ding ein X ueber das Symbol - so wie im
+# Screenshot zu sehen. Das Attribut liegt in der GIO-Metadatenbank des
+# Benutzers, nicht in der Datei, und laesst sich im Chroot nicht setzen -
+# deshalb erledigt das ein Autostart beim ersten Anmelden.
+# ----------------------------------------------------------------------
 for target in /etc/skel/Desktop /home/viperos/Desktop; do
     mkdir -p "$target"
     cp /usr/share/applications/viperos-installer.desktop "$target/"
     chmod 0755 "$target/viperos-installer.desktop"
 done
+
+mkdir -p /usr/local/bin /etc/xdg/autostart
+cat > /usr/local/bin/viperos-trust-desktop << 'EOF'
+#!/bin/sh
+# Markiert die Verknuepfungen auf dem Schreibtisch als vertrauenswuerdig,
+# damit "Desktop Icons NG" sie ohne Warnzeichen anzeigt.
+set -u
+command -v gio >/dev/null 2>&1 || exit 0
+DESK="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
+[ -d "$DESK" ] || exit 0
+
+for f in "$DESK"/*.desktop; do
+    [ -f "$f" ] || continue
+    chmod +x "$f" 2>/dev/null || true
+    gio set "$f" "metadata::trusted" true 2>/dev/null || true
+done
+
+# ding liest die Metadaten beim Start; ein Neuladen macht die Aenderung
+# sofort sichtbar, ohne Abmelden.
+touch "$DESK" 2>/dev/null || true
+exit 0
+EOF
+chmod 0755 /usr/local/bin/viperos-trust-desktop
+
+cat > /etc/xdg/autostart/viperos-trust-desktop.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=ViperOS Desktop-Verknuepfungen
+Comment=Markiert Verknuepfungen als vertrauenswuerdig
+Exec=/usr/local/bin/viperos-trust-desktop
+Icon=preferences-desktop
+Terminal=false
+NoDisplay=true
+OnlyShowIn=GNOME;
+X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Phase=Applications
+EOF
+
 chown -R viperos:viperos /home/viperos 2>/dev/null || true

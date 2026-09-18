@@ -1,0 +1,8 @@
+{
+  "uuid": "viperos-panel@viperos.os",
+  "name": "ViperOS Floating Panel",
+  "description": "Verschiebt die obere Leiste vom Bildschirmrand weg, damit ihre abgerundeten Ecken sichtbar werden. Reines CSS reicht dafuer nicht: St wertet margin an #panel nicht aus, weil die Shell die Leiste selbst positioniert.",
+  "shell-version": ["48"],
+  "settings-schema": "",
+  "url": "https://viperos.os/"
+}

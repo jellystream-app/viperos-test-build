@@ -78,8 +78,12 @@ num-workspaces=4
 # ============================================================
 
 [org/gnome/shell]
-# UUIDs gegen metadata.json der Debian-Pakete geprueft.
-enabled-extensions=['dash-to-dock@micxgx.gmail.com', 'ubuntu-appindicators@ubuntu.com', 'blur-my-shell@aunetx', 'ding@rastersoft.com', 'user-theme@gnome-shell-extensions.gcampax.github.com']
+# UUIDs gegen metadata.json der jeweiligen Pakete geprueft.
+# viperos-panel@viperos.os ist unsere eigene Erweiterung: sie verschiebt
+# die obere Leiste vom Bildschirmrand weg. Ohne sie bleibt die Leiste
+# steif am Rand kleben, weil St "margin" an #panel ignoriert - die
+# abgerundeten Ecken waeren dann nicht sichtbar.
+enabled-extensions=['viperos-panel@viperos.os', 'dash-to-dock@micxgx.gmail.com', 'ubuntu-appindicators@ubuntu.com', 'blur-my-shell@aunetx', 'ding@rastersoft.com', 'user-theme@gnome-shell-extensions.gcampax.github.com']
 favorite-apps=['firefox-esr.desktop', 'org.gnome.Nautilus.desktop', 'jellystream.desktop', 'code.desktop', 'org.gnome.Terminal.desktop', 'viperos-hub.desktop']
 disable-user-extensions=false
 welcome-dialog-last-shown-version='48.0'
