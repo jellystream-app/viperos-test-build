@@ -22,12 +22,11 @@ dbus-user-session
 # policykit-1 war transitional -> polkitd + pkexec
 polkitd
 pkexec
-# KRITISCH fuer den Installer: pkexec braucht einen Authentication Agent,
-# der den Passwortdialog zeigt. Ohne Agent tut "pkexec calamares" schlicht
-# nichts - der Knopf "ViperOS installieren" wirkt dann kaputt.
-# lxpolkit ist mit 47 KB der kleinste GTK-Agent und zieht keinen
-# Desktop-Ballast nach (mate-polkit braucht accountsservice).
-lxpolkit
+# Hinweis zum Authentication Agent (fuer "pkexec calamares"):
+# Unter XFCE fehlte einer, deshalb stand hier lxpolkit. Unter GNOME ist er
+# eingebaut - gnome-shell deklariert "Provides: polkit-1-auth-agent". Ein
+# zweiter Agent wuerde sich mit der Shell um dieselbe Registrierung am
+# Systembus streiten, deshalb ist lxpolkit hier bewusst NICHT eingetragen.
 
 # --- Live-Boot (CRITICAL) ---
 live-boot
@@ -52,42 +51,51 @@ amd64-microcode
 shim-signed
 grub-efi-amd64-signed
 
-# --- Display & XFCE4 Desktop ---
+# --- Display-Server ---
+# Xorg bleibt trotz GNOME-auf-Wayland: XWayland braucht die Xorg-Bausteine,
+# und der Calamares-Installer laeuft als X11-Client (siehe Hook 0040).
 xorg
 xserver-xorg
 xserver-xorg-input-all
-xinit
-xfce4
-xfce4-goodies
-xfce4-terminal
-xfce4-power-manager
-xfce4-notifyd
-xfce4-appfinder
-xfce4-whiskermenu-plugin
-xfce4-clipman-plugin
-xfce4-pulseaudio-plugin
-xfce4-systemload-plugin
-xfce4-netload-plugin
-# Liefert libxfce4powermanager.so fuer das Panel-Plugin "power-manager-plugin".
-# Nur als Recommends von xfce4-power-manager verknuepft und faellt deshalb
-# mit --apt-recommends false weg - ohne dieses Paket fehlt das Plugin und
-# die Panel-Leiste kann beim Laden abbrechen.
-xfce4-power-manager-plugins
-# Bindet die allein gedrueckte Windows-Taste (Super_L); siehe Hook 0022.
-xcape
-xfwm4
-xfdesktop4
-thunar
-thunar-archive-plugin
-thunar-volman
-mousepad
-ristretto
-parole
+xwayland
+
+# --- GNOME Shell (Struktur wie Fedora, Optik eigenstaendig) ---
+gnome-shell
+gnome-session
+gnome-settings-daemon
+gnome-control-center
+gnome-terminal
+nautilus
+gnome-text-editor
+gnome-system-monitor
+gnome-disk-utility
+gnome-tweaks
+gnome-shell-extension-manager
+# dconf-cli liefert "dconf update" - damit werden die systemweiten
+# Vorgaben aus /etc/dconf/db/local.d/ kompiliert (Hook 0025).
+dconf-cli
+dconf-gsettings-backend
+# Mutter braucht diese Daten; ohne sie startet die Shell nicht.
+mutter-common
+gsettings-desktop-schemas
+gnome-themes-extra
+# Portale fuer Flatpaks (Datei-Dialoge, Screenshots) unter GNOME
+xdg-desktop-portal-gnome
+
+# --- GNOME-Erweiterungen (UUIDs in Hook 0025 aktiviert) ---
+# dash-to-dock@micxgx.gmail.com        - Dock am unteren Rand
+gnome-shell-extension-dashtodock
+# ubuntu-appindicators@ubuntu.com      - Tray-Symbole (Discord, KeePassXC)
+gnome-shell-extension-appindicator
+# blur-my-shell@aunetx                 - Blur fuer Topbar und Uebersicht
+gnome-shell-extension-blur-my-shell
+# ding@rastersoft.com                  - Symbole auf dem Schreibtisch
+gnome-shell-extension-desktop-icons-ng
+# user-theme@...gcampax.github.com     - laedt /usr/share/themes/ViperOS
+gnome-shell-extension-user-theme
 
 # --- Login Manager ---
-lightdm
-lightdm-gtk-greeter
-lightdm-gtk-greeter-settings
+gdm3
 
 # --- Browsers ---
 firefox-esr
@@ -167,8 +175,14 @@ fonts-dejavu
 fonts-liberation
 fonts-noto
 fonts-noto-color-emoji
-gtk2-engines-murrine
-arc-theme
+# Inter ist die Oberflaechenschrift von ViperOS (modern, gut lesbar in
+# kleinen Groessen). Wird in Hook 0025 als font-name gesetzt.
+fonts-inter
+# Monospace fuer Terminal und Editor
+fonts-jetbrains-mono
+# Adwaita ist unter GNOME das Basis-Icon-Theme; Papirus liegt darueber,
+# damit Anwendungen ohne eigenes Adwaita-Symbol trotzdem passend aussehen.
+adwaita-icon-theme
 papirus-icon-theme
 
 # --- Systemtools ---

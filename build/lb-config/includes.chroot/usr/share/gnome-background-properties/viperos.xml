@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE wallpapers SYSTEM "gnome-wp-list.dtd">
+<!--
+  Macht die ViperOS-Hintergruende in den GNOME-Einstellungen sichtbar:
+  Einstellungen -> Erscheinungsbild -> Hintergrund.
+
+  Ohne diese Datei liegen die Bilder zwar unter /usr/share/backgrounds/,
+  erscheinen aber nicht in der Auswahl - der Nutzer muesste sie ueber
+  "Bild hinzufuegen" von Hand suchen.
+
+  <filename> ist der helle, <filename-dark> der dunkle Modus. ViperOS
+  laeuft standardmaessig dunkel, beide zeigen daher dasselbe Bild.
+-->
+<wallpapers>
+
+  <wallpaper deleted="false">
+    <name>ViperOS Slate</name>
+    <name xml:lang="de">ViperOS Schiefer</name>
+    <filename>/usr/share/backgrounds/viperos/viperos-slate.jpg</filename>
+    <filename-dark>/usr/share/backgrounds/viperos/viperos-slate.jpg</filename-dark>
+    <options>zoom</options>
+    <shade_type>solid</shade_type>
+    <pcolor>#20232c</pcolor>
+    <scolor>#4a5769</scolor>
+  </wallpaper>
+
+  <wallpaper deleted="false">
+    <name>ViperOS Indigo</name>
+    <filename>/usr/share/backgrounds/viperos/viperos-indigo.jpg</filename>
+    <filename-dark>/usr/share/backgrounds/viperos/viperos-indigo.jpg</filename-dark>
+    <options>zoom</options>
+    <shade_type>solid</shade_type>
+    <pcolor>#20113d</pcolor>
+    <scolor>#324790</scolor>
+  </wallpaper>
+
+  <wallpaper deleted="false">
+    <name>ViperOS Ember</name>
+    <name xml:lang="de">ViperOS Glut</name>
+    <filename>/usr/share/backgrounds/viperos/viperos-ember.jpg</filename>
+    <filename-dark>/usr/share/backgrounds/viperos/viperos-ember.jpg</filename-dark>
+    <options>zoom</options>
+    <shade_type>solid</shade_type>
+    <pcolor>#63291b</pcolor>
+    <scolor>#c97543</scolor>
+  </wallpaper>
+
+  <wallpaper deleted="false">
+    <name>ViperOS Violet</name>
+    <name xml:lang="de">ViperOS Violett</name>
+    <filename>/usr/share/backgrounds/viperos/viperos-violet.jpg</filename>
+    <filename-dark>/usr/share/backgrounds/viperos/viperos-violet.jpg</filename-dark>
+    <options>zoom</options>
+    <shade_type>solid</shade_type>
+    <pcolor>#1f1a26</pcolor>
+    <scolor>#9490a6</scolor>
+  </wallpaper>
+
+  <wallpaper deleted="false">
+    <name>ViperOS Steel</name>
+    <name xml:lang="de">ViperOS Stahl</name>
+    <filename>/usr/share/backgrounds/viperos/viperos-steel.jpg</filename>
+    <filename-dark>/usr/share/backgrounds/viperos/viperos-steel.jpg</filename-dark>
+    <options>zoom</options>
+    <shade_type>solid</shade_type>
+    <pcolor>#202125</pcolor>
+    <scolor>#6a7f92</scolor>
+  </wallpaper>
+
+</wallpapers>

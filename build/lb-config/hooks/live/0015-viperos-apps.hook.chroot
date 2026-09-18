@@ -20,6 +20,92 @@ flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/
 flatpak install --system -y --noninteractive flathub com.discordapp.Discord
 rm -rf /tmp/viperos-apps
 
+# ----------------------------------------------------------------------
+# Jellystream als offizielle ViperOS-Anwendung kennzeichnen
+#
+# Jellystream stammt von denselben Entwicklern wie ViperOS. Das .deb bringt
+# einen generischen Eintrag mit; hier wird er durch eine eigene Fassung
+# ersetzt, die die Herkunft benennt - im Anwendungsmenue und in der
+# Softwareverwaltung.
+# ----------------------------------------------------------------------
+JS_ICON=""
+for candidate in /usr/share/icons/hicolor/512x512/apps/jellystream.png \
+                 /usr/share/icons/hicolor/256x256/apps/jellystream.png \
+                 /opt/Jellystream/resources/app/icon.png \
+                 /usr/share/pixmaps/jellystream.png; do
+    [ -f "$candidate" ] && { JS_ICON="$candidate"; break; }
+done
+
+# Startbefehl aus dem vorhandenen Eintrag uebernehmen, damit der korrekte
+# Pfad und etwaige Parameter erhalten bleiben.
+JS_EXEC="jellystream %U"
+for d in /usr/share/applications/jellystream.desktop \
+         /usr/share/applications/Jellystream.desktop; do
+    if [ -f "$d" ]; then
+        found=$(grep -m1 '^Exec=' "$d" | cut -d= -f2-)
+        [ -n "$found" ] && JS_EXEC="$found"
+        break
+    fi
+done
+
+cat > /usr/share/applications/jellystream.desktop << EOF
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Jellystream
+GenericName=Media Streaming
+GenericName[de]=Medien-Streaming
+Comment=Official ViperOS app - streaming from the ViperOS developers
+Comment[de]=Offizielle ViperOS-App - Streaming von den ViperOS-Entwicklern
+Exec=${JS_EXEC}
+Icon=${JS_ICON:-jellystream}
+Terminal=false
+StartupNotify=true
+StartupWMClass=Jellystream
+Categories=AudioVideo;Video;Player;Network;
+Keywords=stream;streaming;media;video;jellystream;viperos;
+X-ViperOS-Official=true
+X-ViperOS-Vendor=ViperOS Project
+EOF
+
+# AppStream-Metadaten: hierueber zeigen Softwareverwaltungen Entwickler und
+# Herkunft an. Ohne diese Datei stuende dort nur der Paketname.
+mkdir -p /usr/share/metainfo
+cat > /usr/share/metainfo/app.viperos.Jellystream.metainfo.xml << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>app.viperos.Jellystream</id>
+  <launchable type="desktop-id">jellystream.desktop</launchable>
+  <name>Jellystream</name>
+  <summary>Official ViperOS streaming app</summary>
+  <summary xml:lang="de">Offizielle ViperOS-Streaming-App</summary>
+  <developer id="app.viperos">
+    <name>ViperOS Project</name>
+  </developer>
+  <project_license>LicenseRef-proprietary</project_license>
+  <metadata_license>CC0-1.0</metadata_license>
+  <description>
+    <p>
+      Jellystream is developed by the same team as ViperOS and ships
+      preinstalled as an official system application.
+    </p>
+    <p xml:lang="de">
+      Jellystream stammt vom selben Team wie ViperOS und ist als offizielle
+      Systemanwendung vorinstalliert.
+    </p>
+  </description>
+  <categories>
+    <category>AudioVideo</category>
+    <category>Video</category>
+    <category>Player</category>
+  </categories>
+  <url type="homepage">https://viperos.os/</url>
+  <content_rating type="oars-1.1"/>
+</component>
+EOF
+
+echo "[ViperosOS] Jellystream als offizielle App gekennzeichnet."
+
 cat > /usr/local/lib/viperos/update-system << 'EOF'
 #!/bin/sh
 set -eu
@@ -474,7 +560,7 @@ class Hub(Gtk.Window):
             ("Prozessor", cpu_model()),
             ("Kerne", str(cpu_cores())),
             ("Grafik", gpu_model()),
-            ("Desktop", os.environ.get("XDG_CURRENT_DESKTOP", "XFCE")),
+            ("Desktop", os.environ.get("XDG_CURRENT_DESKTOP", "GNOME")),
             ("Sitzung", "Live-Medium" if LIVE_SYSTEM else "Installiert"),
         )
         for index, (key, value) in enumerate(rows):
@@ -490,7 +576,7 @@ class Hub(Gtk.Window):
         tools.add(self.action_button("Systemmonitor", "Prozesse und Auslastung.", self.on_taskmanager))
         tools.add(self.action_button("Laufwerke", "Partitionen mit GParted.", self.on_disks))
         tools.add(self.action_button("Terminal", "Kommandozeile öffnen.", self.on_terminal))
-        tools.add(self.action_button("Einstellungen", "XFCE-Systemeinstellungen.", self.on_settings))
+        tools.add(self.action_button("Einstellungen", "GNOME-Systemeinstellungen.", self.on_settings))
         page.pack_start(tools, False, False, 0)
         return scroller
 
@@ -542,9 +628,9 @@ class Hub(Gtk.Window):
         text.set_markup(
             "<b>ViperOS 1.0</b>\n\n"
             "Ein schlankes Live-System auf Basis von Debian 13 (Trixie) mit "
-            "XFCE-Desktop. Gedacht zum Ausprobieren, Arbeiten und Installieren – "
+            "GNOME-Desktop. Gedacht zum Ausprobieren, Arbeiten und Installieren – "
             "ohne Ballast und ohne Telemetrie.\n\n"
-            "Der Desktop läuft mit Arc-Dark und Papirus-Icons, der Ton über "
+            "Der Desktop läuft mit dem ViperOS-Theme und Papirus-Icons, der Ton über "
             "PipeWire, das Netzwerk über NetworkManager. Installiert wird mit "
             "Calamares.")
         card.pack_start(text, False, False, 0)
@@ -611,8 +697,22 @@ class Hub(Gtk.Window):
             dialog.destroy()
 
     def term(self, command):
-        self.launch(["xfce4-terminal", "--command",
-                     "bash -lc '%s; echo; read -p \"Enter zum Schliessen\"'" % command])
+        """Befehl in einem Terminal ausfuehren und offen lassen.
+
+        gnome-terminal erwartet die Argumente nach '--', anders als
+        xfce4-terminal mit seinem --command. Als Rueckfallebene werden
+        weitere Terminals probiert, falls eines davon fehlt.
+        """
+        inner = "bash -lc '%s; echo; read -p \"Enter zum Schliessen\"'" % command
+        for args in (["gnome-terminal", "--", "bash", "-lc",
+                      "%s; echo; read -p 'Enter zum Schliessen'" % command],
+                     ["xfce4-terminal", "--command", inner],
+                     ["x-terminal-emulator", "-e", inner]):
+            if shutil.which(args[0]):
+                self.launch(args)
+                return
+        self.problem("Kein Terminal gefunden",
+                     "Es ist kein Terminal-Programm installiert.")
 
     def problem(self, title, detail):
         dialog = Gtk.MessageDialog(
@@ -627,8 +727,10 @@ class Hub(Gtk.Window):
         """Installation starten - mit klarer Meldung, wenn etwas fehlt.
 
         pkexec zeigt seinen Passwortdialog nur, wenn in der Sitzung ein
-        polkit-Authentication-Agent laeuft. Fehlt er, passierte bisher
-        einfach nichts. Hier wird das geprueft und benannt.
+        polkit-Authentication-Agent laeuft. Unter GNOME bringt die Shell
+        ihn mit ("Provides: polkit-1-auth-agent"), unter anderen Desktops
+        kann er fehlen - dann wird das hier benannt statt still zu
+        scheitern.
         """
         if shutil.which("calamares") is None:
             self.problem("Installer nicht gefunden",
@@ -637,25 +739,17 @@ class Hub(Gtk.Window):
                          "moeglich.")
             return
 
+        # Unter GNOME ist der Agent Teil von gnome-shell; laeuft die Shell,
+        # ist er da. Sonst nach eigenstaendigen Agenten suchen.
         agent_running = False
-        for name in ("lxpolkit", "polkit-gnome-authentication-agent-1",
+        for name in ("gnome-shell", "lxpolkit",
+                     "polkit-gnome-authentication-agent-1",
                      "polkit-mate-authentication-agent-1",
                      "polkit-kde-authentication-agent-1", "xfce-polkit"):
             if subprocess.run(["pgrep", "-x", name],
                               capture_output=True).returncode == 0:
                 agent_running = True
                 break
-
-        if not agent_running and shutil.which("lxpolkit"):
-            # Agent nachstarten und ihm einen Moment geben, sich am
-            # Systembus zu registrieren.
-            try:
-                subprocess.Popen(["lxpolkit"])
-                GLib.timeout_add_seconds(
-                    2, lambda: (self.launch(["pkexec", "calamares"]), False)[1])
-                return
-            except OSError:
-                pass
 
         if not agent_running:
             self.problem(
@@ -667,13 +761,43 @@ class Hub(Gtk.Window):
             return
 
         self.launch(["pkexec", "calamares"])
+
+    def first_available(self, *candidates):
+        """Erstes vorhandenes Programm aus der Liste starten.
+
+        Nach dem Wechsel von XFCE auf GNOME heissen die Werkzeuge anders.
+        Die GNOME-Variante steht vorn, die XFCE-Fassung bleibt als
+        Rueckfallebene - so funktioniert der Hub auch, wenn jemand ihn auf
+        einem anderen Desktop startet.
+        """
+        for args in candidates:
+            if shutil.which(args[0]):
+                self.launch(args)
+                return
+        self.problem("Programm nicht gefunden",
+                     "Keines dieser Programme ist installiert:\n    %s"
+                     % "\n    ".join(c[0] for c in candidates))
+
     def on_update(self, _b):    self.launch(["pkexec", "/usr/local/lib/viperos/update-system"])
-    def on_network(self, _b):   self.launch(["nm-connection-editor"])
-    def on_files(self, _b):     self.launch(["thunar", os.path.expanduser("~")])
-    def on_taskmanager(self, _b): self.launch(["xfce4-taskmanager"])
-    def on_disks(self, _b):     self.launch(["pkexec", "gparted"])
-    def on_terminal(self, _b):  self.launch(["xfce4-terminal"])
-    def on_settings(self, _b):  self.launch(["xfce4-settings-manager"])
+    def on_network(self, _b):   self.first_available(
+                                    ["gnome-control-center", "network"],
+                                    ["nm-connection-editor"])
+    def on_files(self, _b):     self.first_available(
+                                    ["nautilus", os.path.expanduser("~")],
+                                    ["thunar", os.path.expanduser("~")])
+    def on_taskmanager(self, _b): self.first_available(
+                                    ["gnome-system-monitor"],
+                                    ["xfce4-taskmanager"])
+    def on_disks(self, _b):     self.first_available(
+                                    ["gnome-disks"],
+                                    ["pkexec", "gparted"])
+    def on_terminal(self, _b):  self.first_available(
+                                    ["gnome-terminal"],
+                                    ["xfce4-terminal"],
+                                    ["x-terminal-emulator"])
+    def on_settings(self, _b):  self.first_available(
+                                    ["gnome-control-center"],
+                                    ["xfce4-settings-manager"])
     def on_flatpak(self, _b):   self.term("flatpak list")
     def on_apt(self, _b):       self.term("apt list --upgradable")
 

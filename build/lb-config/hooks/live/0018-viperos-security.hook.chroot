@@ -1,25 +1,64 @@
 #!/bin/bash
+# ViperosOS - Sicherheitsvorgaben
 set -e
+
+echo "[ViperosOS] Setze Sicherheitsvorgaben..."
 
 cat > /etc/apt/apt.conf.d/20auto-upgrades << 'EOF'
 APT::Periodic::Update-Package-Lists "1";
 APT::Periodic::Unattended-Upgrade "1";
 EOF
 
+# Firewall: eingehend blockieren, ausgehend erlauben. ufw laesst DHCP
+# ausdruecklich durch (before.rules), das Netzwerk bleibt also nutzbar.
 sed -i 's/^DEFAULT_INPUT_POLICY=.*/DEFAULT_INPUT_POLICY="DROP"/' /etc/default/ufw
 sed -i 's/^DEFAULT_OUTPUT_POLICY=.*/DEFAULT_OUTPUT_POLICY="ACCEPT"/' /etc/default/ufw
 sed -i 's/^ENABLED=.*/ENABLED=yes/' /etc/ufw/ufw.conf
 
-mkdir -p /etc/systemd/system/lightdm.service.d /usr/local/lib/viperos
-cat > /usr/local/lib/viperos/prepare-lightdm << 'EOF'
+# ----------------------------------------------------------------------
+# Live-Zugang nach der Installation entfernen
+#
+# In der Live-Sitzung darf "viperos" ohne Passwort sudo nutzen - auf einem
+# installierten System waere das ein Sicherheitsloch. Der Dienst prueft
+# beim Start, ob es den Live-Benutzer ueberhaupt gibt: fehlt er (also nach
+# der Installation durch Calamares), wird die sudo-Ausnahme geloescht.
+#
+# Frueher haeng das an lightdm.service. Unter GNOME gibt es LightDM nicht
+# mehr, deshalb laeuft es jetzt als eigener Dienst vor der grafischen
+# Anmeldung.
+# ----------------------------------------------------------------------
+mkdir -p /usr/local/lib/viperos
+
+cat > /usr/local/lib/viperos/drop-live-privileges << 'EOF'
 #!/bin/sh
+# Entfernt die passwortlose sudo-Regel, wenn der Live-Benutzer fehlt.
+set -u
 if ! id viperos >/dev/null 2>&1; then
-    sed -i '/^autologin-user=/d;/^autologin-user-timeout=/d;/^autologin-session=/d' /etc/lightdm/lightdm.conf
     rm -f /etc/sudoers.d/viperos-live
 fi
+exit 0
 EOF
-chmod 0755 /usr/local/lib/viperos/prepare-lightdm
-cat > /etc/systemd/system/lightdm.service.d/viperos.conf << 'EOF'
+chmod 0755 /usr/local/lib/viperos/drop-live-privileges
+
+cat > /etc/systemd/system/viperos-drop-live-privileges.service << 'EOF'
+[Unit]
+Description=ViperOS: Live-Sonderrechte auf installierten Systemen entfernen
+Before=display-manager.service
+DefaultDependencies=no
+After=local-fs.target
+
 [Service]
-ExecStartPre=/usr/local/lib/viperos/prepare-lightdm
+Type=oneshot
+ExecStart=/usr/local/lib/viperos/drop-live-privileges
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
 EOF
+
+# Symlink direkt setzen - systemctl scheitert im Chroot ohne systemd.
+mkdir -p /etc/systemd/system/multi-user.target.wants
+ln -sf /etc/systemd/system/viperos-drop-live-privileges.service \
+       /etc/systemd/system/multi-user.target.wants/viperos-drop-live-privileges.service
+
+echo "[ViperosOS] Sicherheitsvorgaben gesetzt."

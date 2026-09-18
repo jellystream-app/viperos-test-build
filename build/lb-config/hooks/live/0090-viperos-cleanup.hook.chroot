@@ -33,12 +33,23 @@ mkdir -p /home/viperos/Desktop
 cp /etc/skel/Desktop/* /home/viperos/Desktop/ 2>/dev/null || true
 chown -R viperos:viperos /home/viperos/ 2>/dev/null || true
 
-# Systemd-Targets optimieren für schnelleren Boot
-systemctl set-default graphical.target 2>/dev/null || true
-systemctl disable plymouth 2>/dev/null || true
-systemctl enable NetworkManager 2>/dev/null || true
-systemctl enable lightdm 2>/dev/null || true
-systemctl enable bluetooth 2>/dev/null || true
+# Systemd-Targets. Die Symlinks werden direkt gesetzt, weil systemctl im
+# Chroot ohne laufenden systemd fehlschlaegt und "|| true" den Fehler
+# verstecken wuerde (genau das hat den Ton gekostet, siehe Hook 0055).
+mkdir -p /etc/systemd/system/multi-user.target.wants
+ln -sf /lib/systemd/system/graphical.target /etc/systemd/system/default.target 2>/dev/null || \
+  ln -sf /usr/lib/systemd/system/graphical.target /etc/systemd/system/default.target 2>/dev/null || true
+
+for svc in NetworkManager bluetooth; do
+    for base in /lib/systemd/system /usr/lib/systemd/system; do
+        if [ -f "$base/$svc.service" ]; then
+            ln -sf "$base/$svc.service" \
+                   "/etc/systemd/system/multi-user.target.wants/$svc.service"
+            break
+        fi
+    done
+done
+# GDM wird in Hook 0030 als display-manager.service verlinkt.
 
 # Audio wird vollstaendig in 0055-viperos-audio eingerichtet.
 # Frueher standen hier drei "systemctl --global enable"-Aufrufe. Ohne
@@ -57,8 +68,9 @@ echo "[ViperosOS] Finale Konfiguration abgeschlossen."
 echo ""
 echo "  ✓ ViperosOS 1.0 Build-Konfiguration komplett"
 echo "  ✓ Live-User: viperos / viperos"
-echo "  ✓ Desktop: XFCE4 mit Arc-Dark Theme"
+echo "  ✓ Desktop: GNOME Shell 48 mit ViperOS-Theme"
 echo "  ✓ Browser: Firefox ESR"
 echo "  ✓ Netzwerk: NetworkManager"
-echo "  ✓ Login: LightDM (Autologin im Live-Mode)"
+echo "  ✓ Login: GDM (Autologin im Live-Mode)"
+echo "  ✓ Audio: PipeWire"
 echo "  ✓ Installer: Calamares"

@@ -1,293 +1,505 @@
 #!/bin/bash
-# ViperosOS - Theme & Desktop Setup (Modern Linux Topbar + Dark Glass + Classic Window Buttons)
+# ViperosOS - eigenes GNOME-Shell-Theme
+#
+# Ziel: die Struktur von GNOME (Uebersicht, Dash, Workspaces) behalten, das
+# Aussehen aber eigenstaendig machen. Geladen wird das Theme von der
+# Erweiterung user-theme, die in Hook 0025 auf 'ViperOS' gesetzt wird.
+#
+# Die Farben sind aus den mitgelieferten Hintergruenden abgeleitet, damit
+# Leiste und Fenster zum Bild passen:
+#   #12151f  Grund (dunkler als der Hintergrund, damit er sich absetzt)
+#   #1b1f2e  Flaechen (Panel, Dash, Popups)
+#   #252b3d  erhoehte Flaechen (Menueeintraege, Karten)
+#   #6a8fd8  Akzent (Auswahl, Fokus, aktive Elemente)
+#   #e7eef9  Text
+#   #8ea3c0  Text gedaempft
 
 set -e
 
-echo "[ViperosOS] Konfiguriere Modern-Linux Dark-Glass Desktop Theme..."
+echo "[ViperosOS] Erstelle GNOME-Shell-Theme..."
 
-# XFCE4 Konfiguration für Live-User und Skel
-for USER_DIR in /home/viperos /etc/skel; do
-    mkdir -p "${USER_DIR}/.config/xfce4/xfconf/xfce-perchannel-xml"
-    mkdir -p "${USER_DIR}/.config/xfce4/panel"
-    mkdir -p "${USER_DIR}/.config/autostart"
+THEME=/usr/share/themes/ViperOS
+mkdir -p "$THEME/gnome-shell"
 
-    # 1. XFCE4 Desktop Einstellungen
-    cat > "${USER_DIR}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml" << 'XFCEEOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!--
-  Monitor-Namen sind NICHT vorhersagbar: xfdesktop legt den xfconf-Pfad nach
-  dem tatsaechlichen Ausgang an (monitoreDP-1, monitorVirtual-1, monitorLVDS-1,
-  monitorHDMI-1 ...). Ein fest verdrahteter Name greift nur auf genau dieser
-  Hardware; sonst bleibt der Hintergrund grau. Deshalb sind hier die
-  gaengigsten Ausgaenge hinterlegt, und 0085-viperos-wallpaper setzt den
-  Hintergrund beim Sessionstart zusaetzlich fuer den real erkannten Monitor.
--->
-<channel name="xfce4-desktop" version="1.0">
-  <property name="backdrop" type="empty">
-    <property name="screen0" type="empty">
-      <property name="monitor0" type="empty">
-        <property name="workspace0" type="empty">
-          <property name="color-style" type="int" value="0"/>
-          <property name="image-style" type="int" value="5"/>
-          <property name="last-image" type="string" value="/usr/share/viperos/wallpaper.png"/>
-        </property>
-      </property>
-      <property name="monitorHDMI-1" type="empty">
-        <property name="workspace0" type="empty">
-          <property name="color-style" type="int" value="0"/>
-          <property name="image-style" type="int" value="5"/>
-          <property name="last-image" type="string" value="/usr/share/viperos/wallpaper.png"/>
-        </property>
-      </property>
-      <property name="monitorHDMI-A-1" type="empty">
-        <property name="workspace0" type="empty">
-          <property name="color-style" type="int" value="0"/>
-          <property name="image-style" type="int" value="5"/>
-          <property name="last-image" type="string" value="/usr/share/viperos/wallpaper.png"/>
-        </property>
-      </property>
-      <property name="monitoreDP-1" type="empty">
-        <property name="workspace0" type="empty">
-          <property name="color-style" type="int" value="0"/>
-          <property name="image-style" type="int" value="5"/>
-          <property name="last-image" type="string" value="/usr/share/viperos/wallpaper.png"/>
-        </property>
-      </property>
-      <property name="monitorDP-1" type="empty">
-        <property name="workspace0" type="empty">
-          <property name="color-style" type="int" value="0"/>
-          <property name="image-style" type="int" value="5"/>
-          <property name="last-image" type="string" value="/usr/share/viperos/wallpaper.png"/>
-        </property>
-      </property>
-      <property name="monitorVirtual-1" type="empty">
-        <property name="workspace0" type="empty">
-          <property name="color-style" type="int" value="0"/>
-          <property name="image-style" type="int" value="5"/>
-          <property name="last-image" type="string" value="/usr/share/viperos/wallpaper.png"/>
-        </property>
-      </property>
-      <property name="monitorVGA-1" type="empty">
-        <property name="workspace0" type="empty">
-          <property name="color-style" type="int" value="0"/>
-          <property name="image-style" type="int" value="5"/>
-          <property name="last-image" type="string" value="/usr/share/viperos/wallpaper.png"/>
-        </property>
-      </property>
-    </property>
-  </property>
-  <property name="desktop-icons" type="empty">
-    <property name="style" type="int" value="2"/>
-    <property name="show-home" type="bool" value="true"/>
-    <property name="show-trash" type="bool" value="true"/>
-    <property name="show-filesystem" type="bool" value="false"/>
-    <property name="show-removable" type="bool" value="true"/>
-    <property name="icon-size" type="uint" value="48"/>
-  </property>
-</channel>
-XFCEEOF
+cat > "$THEME/gnome-shell/gnome-shell.css" << 'CSSEOF'
+/* ============================================================
+   ViperOS - GNOME Shell Theme
+   Basiert auf Adwaita-dark, ueberschreibt Farben und Rundungen.
+   ============================================================ */
 
-    # 2. XFWM4 Fenstermanager Theme (Klassische Fensterknöpfe - X oben rechts)
-    cat > "${USER_DIR}/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml" << 'XFWMEOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<channel name="xfwm4" version="1.0">
-  <property name="general" type="empty">
-    <property name="theme" type="string" value="Arc-Dark"/>
-    <property name="title_font" type="string" value="Noto Sans Bold 10"/>
-    <property name="title_alignment" type="string" value="left"/>
-    <property name="button_layout" type="string" value="O|HMC"/>
-    <property name="box_resize" type="bool" value="false"/>
-    <property name="use_compositing" type="bool" value="true"/>
-    <property name="frame_opacity" type="int" value="95"/>
-    <property name="inactive_opacity" type="int" value="85"/>
-  </property>
-</channel>
-XFWMEOF
+/* ---------- Grundlagen ---------- */
+stage {
+  font-family: Inter, "Noto Sans", sans-serif;
+  font-size: 11pt;
+  color: #e7eef9;
+}
 
-    # 3. GTK Theme & Icon Theme (macOS Dark Aesthetics + Papirus Icons)
-    cat > "${USER_DIR}/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml" << 'XSETEOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<channel name="xsettings" version="1.0">
-  <property name="Net" type="empty">
-    <property name="ThemeName" type="string" value="Arc-Dark"/>
-    <property name="IconThemeName" type="string" value="Papirus-Dark"/>
-    <property name="CursorThemeName" type="string" value="breeze_cursors"/>
-  </property>
-  <property name="Gtk" type="empty">
-    <property name="FontName" type="string" value="Noto Sans 10"/>
-    <property name="MonospaceFontName" type="string" value="Noto Sans Mono 10"/>
-    <property name="CursorThemeSize" type="int" value="24"/>
-    <property name="DecorationLayout" type="string" value="menu:minimize,maximize,close"/>
-  </property>
-</channel>
-XSETEOF
+/* ---------- Obere Leiste ---------- */
+#panel {
+  background-color: rgba(18, 21, 31, 0.82);
+  font-weight: 600;
+  height: 34px;
+  border-bottom: 1px solid rgba(106, 143, 216, 0.16);
+}
 
-    # 4. Modern Linux Topbar (Transparente XFCE-Panel Leiste oben + Whisker App-Menü & Taskleiste)
-    cat > "${USER_DIR}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml" << 'PANELEOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!--
-  WICHTIG: panel-1 MUSS innerhalb von <property name="panels"> liegen.
-  xfconf-Pfade sind hierarchisch: verschachtelt entsteht /panels/panel-1/...,
-  auf Top-Level dagegen /panel-1/... - Letzteres liest xfce4-panel nicht,
-  die Leiste bleibt dann komplett unsichtbar.
-  Referenz: /etc/xdg/xfce4/panel/default.xml aus dem Paket xfce4-panel.
--->
-<channel name="xfce4-panel" version="1.0">
-  <property name="configver" type="int" value="2"/>
-  <property name="panels" type="array">
-    <value type="int" value="1"/>
-    <property name="dark-mode" type="bool" value="true"/>
-    <property name="panel-1" type="empty">
-      <property name="position" type="string" value="p=6;x=0;y=0"/>
-      <property name="length" type="uint" value="100"/>
-      <property name="length-adjust" type="bool" value="true"/>
-      <property name="position-locked" type="bool" value="true"/>
-      <property name="icon-size" type="uint" value="16"/>
-      <property name="size" type="uint" value="34"/>
-      <property name="background-style" type="uint" value="1"/>
-      <property name="background-rgba" type="array">
-        <value type="double" value="0.06"/>
-        <value type="double" value="0.09"/>
-        <value type="double" value="0.16"/>
-        <value type="double" value="0.85"/>
-      </property>
-      <property name="plugin-ids" type="array">
-        <value type="int" value="1"/>
-        <value type="int" value="2"/>
-        <value type="int" value="3"/>
-        <value type="int" value="4"/>
-        <value type="int" value="5"/>
-        <value type="int" value="6"/>
-        <value type="int" value="7"/>
-        <value type="int" value="8"/>
-        <value type="int" value="9"/>
-      </property>
-    </property>
-  </property>
-  <property name="plugins" type="empty">
-    <property name="plugin-1" type="string" value="whiskermenu"/>
-    <property name="plugin-2" type="string" value="separator">
-      <property name="expand" type="bool" value="false"/>
-      <property name="style" type="uint" value="0"/>
-    </property>
-    <property name="plugin-3" type="string" value="tasklist">
-      <property name="grouping" type="uint" value="1"/>
-    </property>
-    <property name="plugin-4" type="string" value="separator">
-      <property name="expand" type="bool" value="true"/>
-      <property name="style" type="uint" value="0"/>
-    </property>
-    <property name="plugin-5" type="string" value="systray">
-      <property name="square-icons" type="bool" value="true"/>
-    </property>
-    <property name="plugin-6" type="string" value="pulseaudio"/>
-    <property name="plugin-7" type="string" value="power-manager-plugin"/>
-    <property name="plugin-8" type="string" value="clock">
-      <property name="digital-layout" type="uint" value="3"/>
-      <property name="digital-time-format" type="string" value="%H:%M"/>
-      <property name="digital-date-format" type="string" value="%d.%m.%Y"/>
-    </property>
-    <property name="plugin-9" type="string" value="actions"/>
-  </property>
-</channel>
-PANELEOF
+#panel:overview {
+  background-color: rgba(18, 21, 31, 0.55);
+}
 
-    # 5. Whisker-Menu Konfiguration
-    cat > "${USER_DIR}/.config/xfce4/panel/whiskermenu-1.rc" << 'WHISKEREOF'
-button-title=ViperOS
-button-icon=/usr/share/viperos/user-icon.png
-button-single-row=true
-show-button-title=true
-show-button-icon=true
-category-icon-size=1
-item-icon-size=2
-hover-switch-category=true
-WHISKEREOF
+#panel .panel-button {
+  color: #d4dff0;
+  border-radius: 9px;
+  margin: 3px 2px;
+  padding: 0 10px;
+  transition-duration: 150ms;
+}
 
-    # 6. Keyboard Shortcuts (Windows-Taste -> Whisker Menu / App-Suche, Super+Space, Ctrl+Alt+T)
-    cat > "${USER_DIR}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-keyboard-shortcuts.xml" << 'KEYEOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!--
-  Die Windows-Taste allein (Super_L) ist ein reiner MODIFIER. X11 liefert
-  dafuer kein Accelerator-Event, deshalb kann xfconf sie nicht binden -
-  "Super_L" und "<Super>" hier einzutragen bleibt wirkungslos.
-  Gebunden wird sie stattdessen von xcape (siehe 0022-viperos-superkey),
-  das ein allein gedruecktes Super_L in XF86LaunchA uebersetzt; dieses
-  Keysym ruft hier das Whisker-Menue auf.
+#panel .panel-button:hover {
+  background-color: rgba(106, 143, 216, 0.18);
+  color: #ffffff;
+}
 
-  NICHT Ctrl+Alt+F1 verwenden: das ist der VT-Wechsel auf die Textkonsole
-  (xkb symbols/srvr_ctrl -> compat/xfree86 SwitchScreen). Ein Druck auf
-  Super landete dadurch auf tty1 mit Login-Prompt ("authentication
-  failure"), waehrend der Desktop unsichtbar weiterlief.
--->
-<channel name="xfce4-keyboard-shortcuts" version="1.0">
-  <property name="commands" type="empty">
-    <property name="custom" type="empty">
-      <property name="override" type="bool" value="true"/>
-      <property name="XF86LaunchA" type="string" value="xfce4-popup-whiskermenu"/>
-      <property name="&lt;Super&gt;space" type="string" value="xfce4-appfinder"/>
-      <property name="&lt;Primary&gt;&lt;Alt&gt;t" type="string" value="xfce4-terminal"/>
-      <property name="&lt;Super&gt;e" type="string" value="thunar"/>
-      <property name="&lt;Super&gt;t" type="string" value="xfce4-terminal"/>
-    </property>
-  </property>
-</channel>
-KEYEOF
+#panel .panel-button:active,
+#panel .panel-button:checked,
+#panel .panel-button:focus {
+  background-color: rgba(106, 143, 216, 0.30);
+  color: #ffffff;
+}
 
-    # 6. Terminal Tuning (.bashrc Aliases & Fastfetch)
-    cat >> "${USER_DIR}/.bashrc" << 'BASHCEOF'
+#panel .panel-button .system-status-icon {
+  icon-size: 16px;
+  padding: 0 2px;
+}
 
-# ViperOS Terminal Prompt & Aliases
-export PS1='\[\033[01;32m\]viperos@viperos\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
+/* Uhr mittig hervorheben */
+#panel #panelCenter .panel-button {
+  font-weight: 600;
+  color: #ffffff;
+}
 
-alias ll='ls -alF --color=auto'
-alias la='ls -A --color=auto'
-alias l='ls -CF --color=auto'
-alias update='sudo apt update && sudo apt upgrade -y'
-alias install='sudo apt install -y'
-alias cls='clear'
+/* ---------- Menues und Popups ---------- */
+.popup-menu {
+  color: #e7eef9;
+}
 
-if command -v fastfetch >/dev/null 2>&1; then
-    fastfetch
+.popup-menu-boxpointer,
+.candidate-popup-boxpointer {
+  -arrow-border-radius: 16px;
+  -arrow-background-color: rgba(27, 31, 46, 0.97);
+  -arrow-border-color: rgba(106, 143, 216, 0.22);
+  -arrow-border-width: 1px;
+  -arrow-base: 0;
+  -arrow-rise: 0;
+  -boxpointer-gap: 6px;
+}
+
+.popup-menu-content {
+  padding: 8px;
+  border-radius: 16px;
+}
+
+.popup-menu-item {
+  border-radius: 10px;
+  padding: 8px 12px;
+  spacing: 10px;
+}
+
+.popup-menu-item:hover,
+.popup-menu-item:focus {
+  background-color: rgba(106, 143, 216, 0.22);
+}
+
+.popup-menu-item:active {
+  background-color: #6a8fd8;
+  color: #0e1119;
+}
+
+.popup-separator-menu-item {
+  background-color: transparent;
+}
+
+.popup-separator-menu-item .popup-separator-menu-item-separator {
+  background-color: rgba(142, 163, 192, 0.20);
+  height: 1px;
+}
+
+/* Schnelleinstellungen (Lautstaerke, WLAN, Akku) */
+.quick-settings {
+  padding: 14px;
+  border-radius: 18px;
+}
+
+.quick-toggle {
+  background-color: #252b3d;
+  border-radius: 14px;
+  color: #e7eef9;
+  min-height: 46px;
+}
+
+.quick-toggle:checked,
+.quick-toggle:checked:hover {
+  background-color: #6a8fd8;
+  color: #0e1119;
+}
+
+.quick-toggle:hover {
+  background-color: #2e364c;
+}
+
+.quick-slider .slider {
+  color: #6a8fd8;
+  -barlevel-background-color: #252b3d;
+  -barlevel-active-background-color: #6a8fd8;
+  -barlevel-height: 5px;
+  -barlevel-border-radius: 999px;
+}
+
+/* ---------- Uebersicht ---------- */
+#overviewGroup {
+  background-color: rgba(14, 17, 25, 0.35);
+}
+
+.workspace-thumbnails {
+  spacing: 8px;
+  padding: 8px;
+}
+
+.workspace-thumbnail {
+  border-radius: 10px;
+}
+
+.workspace-thumbnail-indicator {
+  border: 2px solid #6a8fd8;
+  border-radius: 10px;
+}
+
+.window-picker {
+  spacing: 16px;
+}
+
+.window-clone-border {
+  border: 2px solid rgba(106, 143, 216, 0.85);
+  border-radius: 12px;
+}
+
+.window-caption {
+  background-color: rgba(27, 31, 46, 0.92);
+  border-radius: 999px;
+  color: #e7eef9;
+  padding: 5px 14px;
+  font-weight: 600;
+}
+
+/* Suchfeld */
+#searchEntry {
+  background-color: rgba(37, 43, 61, 0.92);
+  border: 1px solid rgba(106, 143, 216, 0.20);
+  border-radius: 999px;
+  color: #e7eef9;
+  padding: 9px 18px;
+  width: 340px;
+}
+
+#searchEntry:focus {
+  border-color: #6a8fd8;
+  box-shadow: inset 0 0 0 1px rgba(106, 143, 216, 0.55);
+}
+
+#searchEntry StIcon.capslock-warning {
+  icon-size: 16px;
+}
+
+.search-section-content {
+  background-color: rgba(27, 31, 46, 0.85);
+  border-radius: 16px;
+  padding: 12px;
+}
+
+.search-provider-icon:hover,
+.list-search-result:hover {
+  background-color: rgba(106, 143, 216, 0.20);
+  border-radius: 12px;
+}
+
+/* ---------- Anwendungsraster ---------- */
+.app-well-app .overview-icon,
+.app-grid .overview-icon,
+.grid-search-result .overview-icon {
+  border-radius: 14px;
+  padding: 10px;
+  color: #e7eef9;
+  transition-duration: 150ms;
+}
+
+.app-well-app:hover .overview-icon,
+.app-grid .overview-icon:hover,
+.grid-search-result:hover .overview-icon {
+  background-color: rgba(106, 143, 216, 0.20);
+}
+
+.app-well-app:active .overview-icon,
+.app-well-app:checked .overview-icon {
+  background-color: rgba(106, 143, 216, 0.34);
+}
+
+.app-folder-dialog {
+  background-color: rgba(27, 31, 46, 0.97);
+  border: 1px solid rgba(106, 143, 216, 0.22);
+  border-radius: 20px;
+}
+
+.page-indicator .page-indicator-icon {
+  background-color: rgba(142, 163, 192, 0.35);
+}
+
+.page-indicator:checked .page-indicator-icon {
+  background-color: #6a8fd8;
+}
+
+/* ---------- Dash ---------- */
+#dash {
+  background-color: rgba(27, 31, 46, 0.72);
+  border: 1px solid rgba(106, 143, 216, 0.16);
+  border-radius: 20px;
+  padding: 6px;
+}
+
+#dash .placeholder {
+  background-image: none;
+}
+
+.dash-item-container .app-well-app .overview-icon {
+  border-radius: 13px;
+}
+
+.dash-separator {
+  background-color: rgba(142, 163, 192, 0.22);
+  width: 1px;
+  margin: 0 6px;
+}
+
+/* ---------- Benachrichtigungen ---------- */
+.message {
+  background-color: rgba(37, 43, 61, 0.95);
+  border-radius: 14px;
+  color: #e7eef9;
+  margin: 4px 0;
+}
+
+.message:hover {
+  background-color: rgba(46, 54, 76, 0.97);
+}
+
+.message-title {
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.message-content {
+  color: #a9b8ce;
+}
+
+.message-media-control:hover {
+  background-color: rgba(106, 143, 216, 0.22);
+  border-radius: 999px;
+}
+
+.datemenu-today-button,
+.datemenu-displays-box {
+  border-radius: 14px;
+}
+
+.calendar {
+  border-radius: 14px;
+  padding: 8px;
+}
+
+.calendar-today {
+  background-color: #6a8fd8;
+  color: #0e1119;
+  font-weight: 800;
+  border-radius: 999px;
+}
+
+.calendar-day-base:hover {
+  background-color: rgba(106, 143, 216, 0.22);
+  border-radius: 999px;
+}
+
+.calendar-day-base:selected {
+  background-color: rgba(106, 143, 216, 0.40);
+  border-radius: 999px;
+}
+
+/* ---------- Dialoge ---------- */
+.modal-dialog {
+  background-color: rgba(27, 31, 46, 0.98);
+  border: 1px solid rgba(106, 143, 216, 0.22);
+  border-radius: 18px;
+  color: #e7eef9;
+}
+
+.modal-dialog-linked-button {
+  background-color: #252b3d;
+  border: none;
+  color: #e7eef9;
+  font-weight: 600;
+  padding: 12px;
+}
+
+.modal-dialog-linked-button:hover {
+  background-color: #2e364c;
+}
+
+.modal-dialog-linked-button:default {
+  background-color: #6a8fd8;
+  color: #0e1119;
+}
+
+.modal-dialog-linked-button:default:hover {
+  background-color: #7fa3e6;
+}
+
+/* Anmeldung und Bildschirmsperre */
+.login-dialog,
+.unlock-dialog {
+  background-color: transparent;
+}
+
+.login-dialog-user-list-view,
+.login-dialog-banner-view {
+  border-radius: 18px;
+}
+
+.login-dialog-user-list:expanded .login-dialog-user-list-item:focus {
+  background-color: rgba(106, 143, 216, 0.30);
+  border-radius: 12px;
+}
+
+.login-dialog-prompt-entry,
+.unlock-dialog-prompt-entry {
+  background-color: rgba(37, 43, 61, 0.92);
+  border: 1px solid rgba(106, 143, 216, 0.24);
+  border-radius: 999px;
+  color: #e7eef9;
+  padding: 9px 16px;
+}
+
+.login-dialog-prompt-entry:focus,
+.unlock-dialog-prompt-entry:focus {
+  border-color: #6a8fd8;
+}
+
+.login-dialog-button,
+.unlock-dialog-button {
+  border-radius: 999px;
+}
+
+/* ---------- Bildschirmanzeigen (Lautstaerke, Helligkeit) ---------- */
+.osd-window {
+  background-color: rgba(27, 31, 46, 0.96);
+  border: 1px solid rgba(106, 143, 216, 0.22);
+  border-radius: 18px;
+  color: #e7eef9;
+}
+
+.osd-window .level-bar {
+  background-color: #6a8fd8;
+  border-radius: 999px;
+}
+
+/* ---------- Schalter und Regler ---------- */
+.toggle-switch {
+  color: #8ea3c0;
+}
+
+.slider {
+  color: #6a8fd8;
+  -barlevel-background-color: #252b3d;
+  -barlevel-active-background-color: #6a8fd8;
+  -slider-handle-radius: 9px;
+  -barlevel-height: 5px;
+  -barlevel-border-radius: 999px;
+}
+
+/* ---------- Hilfetexte ---------- */
+.dash-label,
+.tile-preview,
+#Tooltip {
+  background-color: rgba(27, 31, 46, 0.97);
+  border: 1px solid rgba(106, 143, 216, 0.22);
+  border-radius: 10px;
+  color: #e7eef9;
+  padding: 6px 12px;
+}
+
+.tile-preview {
+  background-color: rgba(106, 143, 216, 0.28);
+  border: 2px solid #6a8fd8;
+  border-radius: 12px;
+}
+
+/* ---------- Scrollbalken ---------- */
+StScrollBar StButton#vhandle,
+StScrollBar StButton#hhandle {
+  background-color: rgba(142, 163, 192, 0.35);
+  border-radius: 999px;
+}
+
+StScrollBar StButton#vhandle:hover,
+StScrollBar StButton#hhandle:hover {
+  background-color: rgba(142, 163, 192, 0.55);
+}
+CSSEOF
+
+# index.theme kennzeichnet das Verzeichnis als Theme; ohne sie taucht
+# "ViperOS" in gnome-tweaks nicht in der Auswahl auf.
+cat > "$THEME/index.theme" << 'EOF'
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=ViperOS
+Comment=Dunkles ViperOS-Erscheinungsbild
+Encoding=UTF-8
+
+[X-GNOME-Metatheme]
+GtkTheme=Adwaita-dark
+MetacityTheme=Adwaita
+IconTheme=Papirus-Dark
+CursorTheme=Adwaita
+ButtonLayout=appmenu:minimize,maximize,close
+EOF
+
+# GTK4-Anwendungen (Nautilus, Einstellungen) nutzen libadwaita. Deren
+# Farben lassen sich nicht per Theme tauschen, aber ueber @define-color
+# in der Benutzer-CSS anpassen - hier systemweit als Vorgabe.
+mkdir -p /etc/skel/.config/gtk-4.0 /etc/skel/.config/gtk-3.0
+cat > /etc/skel/.config/gtk-4.0/gtk.css << 'EOF'
+/* ViperOS: libadwaita-Farben an das Shell-Theme angleichen */
+@define-color accent_bg_color #6a8fd8;
+@define-color accent_color #8fb0e8;
+@define-color window_bg_color #12151f;
+@define-color window_fg_color #e7eef9;
+@define-color view_bg_color #1b1f2e;
+@define-color view_fg_color #e7eef9;
+@define-color headerbar_bg_color #1b1f2e;
+@define-color headerbar_fg_color #e7eef9;
+@define-color sidebar_bg_color #161a27;
+@define-color sidebar_fg_color #e7eef9;
+@define-color card_bg_color #252b3d;
+@define-color card_fg_color #e7eef9;
+@define-color popover_bg_color #1f2433;
+@define-color popover_fg_color #e7eef9;
+@define-color dialog_bg_color #1b1f2e;
+@define-color dialog_fg_color #e7eef9;
+EOF
+cp /etc/skel/.config/gtk-4.0/gtk.css /etc/skel/.config/gtk-3.0/gtk.css
+
+# Fuer den Live-Benutzer, der vor diesem Hook angelegt wurde.
+if id viperos >/dev/null 2>&1; then
+    mkdir -p /home/viperos/.config/gtk-4.0 /home/viperos/.config/gtk-3.0
+    cp /etc/skel/.config/gtk-4.0/gtk.css /home/viperos/.config/gtk-4.0/gtk.css
+    cp /etc/skel/.config/gtk-3.0/gtk.css /home/viperos/.config/gtk-3.0/gtk.css
+    chown -R viperos:viperos /home/viperos/.config 2>/dev/null || true
 fi
-BASHCEOF
 
-    if [ -d "${USER_DIR}" ]; then
-        chown -R viperos:viperos "${USER_DIR}" 2>/dev/null || true
-    fi
-done
-
-echo "[ViperosOS] Desktop-Theme & Topbar erfolgreich konfiguriert."
-
-# ================================================================
-# Systemweite XFCE-Konfiguration unter /etc/xdg/
-# XFCE liest beim Login ZUERST /etc/xdg/xfce4/ und DANN ~/.config/xfce4/
-# Im Live-Modus existiert ~/.config/ oft noch nicht wenn XFCE startet,
-# deshalb MUSS die Config hier liegen damit Panel, Theme und Shortcuts
-# beim ersten Boot sofort korrekt geladen werden.
-# ================================================================
-
-echo "[ViperosOS] Kopiere Konfiguration nach /etc/xdg/xfce4/ (systemweit)..."
-
-# Alle XFCE xfconf XML-Dateien systemweit ablegen
-mkdir -p /etc/xdg/xfce4/xfconf/xfce-perchannel-xml
-for f in xfce4-panel.xml xfwm4.xml xsettings.xml xfce4-desktop.xml xfce4-keyboard-shortcuts.xml; do
-    if [ -f "/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/${f}" ]; then
-        cp "/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/${f}" \
-           "/etc/xdg/xfce4/xfconf/xfce-perchannel-xml/${f}"
-        echo "  -> ${f} kopiert"
-    fi
-done
-
-# Whisker-Menu Config systemweit
-mkdir -p /etc/xdg/xfce4/panel
-if [ -f /etc/skel/.config/xfce4/panel/whiskermenu-1.rc ]; then
-    cp /etc/skel/.config/xfce4/panel/whiskermenu-1.rc /etc/xdg/xfce4/panel/whiskermenu-1.rc
-    echo "  -> whiskermenu-1.rc kopiert"
-fi
-
-# Panel default.xml Fallback (manche XFCE-Versionen lesen das)
-cp /etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml \
-   /etc/xdg/xfce4/panel/default.xml 2>/dev/null || true
-
-echo "[ViperosOS] Systemweite /etc/xdg/ Konfiguration abgeschlossen."
+echo "[ViperosOS] Shell-Theme unter $THEME erstellt."

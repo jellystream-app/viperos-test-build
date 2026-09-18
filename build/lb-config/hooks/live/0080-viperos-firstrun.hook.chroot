@@ -20,7 +20,7 @@ Name=ViperOS Hub
 Exec=/usr/local/bin/viperos-first-run
 Icon=viperos
 Terminal=false
-OnlyShowIn=XFCE;
+OnlyShowIn=GNOME;
 X-GNOME-Autostart-enabled=true
 EOF
 

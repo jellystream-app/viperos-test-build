@@ -1,0 +1,210 @@
+#!/bin/bash
+# ViperosOS - systemweite GNOME-Vorgaben ueber dconf
+#
+# Warum dconf und nicht gsettings:
+# gsettings schreibt in die Datenbank des AKTUELLEN Benutzers - im Chroot
+# gibt es keinen. dconf-Systemvorgaben dagegen liegen in
+# /etc/dconf/db/local.d/ und gelten fuer JEDEN Benutzer, auch fuer den, den
+# Calamares bei der Installation anlegt. Genau das wollen wir: Das Aussehen
+# soll nach der Installation erhalten bleiben, nicht nur in der Live-Sitzung.
+#
+# Der Nutzer kann alles weiterhin aendern; seine Aenderung liegt dann in der
+# user-Datenbank und hat Vorrang. Mit "lock" liesse sich das verhindern -
+# das machen wir bewusst nicht.
+
+set -e
+
+echo "[ViperosOS] Schreibe systemweite GNOME-Vorgaben..."
+
+mkdir -p /etc/dconf/profile /etc/dconf/db/local.d
+
+# Das Profil bestimmt die Reihenfolge: zuerst die Benutzerdatenbank,
+# dahinter unsere Systemvorgaben als Rueckfallebene.
+cat > /etc/dconf/profile/user << 'EOF'
+user-db:user
+system-db:local
+EOF
+
+cat > /etc/dconf/db/local.d/00-viperos << 'EOF'
+# ============================================================
+# ViperOS - Erscheinungsbild
+# ============================================================
+
+[org/gnome/desktop/interface]
+# Dunkles Erscheinungsbild als Standard
+color-scheme='prefer-dark'
+gtk-theme='Adwaita-dark'
+icon-theme='Papirus-Dark'
+cursor-theme='Adwaita'
+# Inter als Oberflaechenschrift, JetBrains Mono fuer Monospace
+font-name='Inter 11'
+document-font-name='Inter 11'
+monospace-font-name='JetBrains Mono 10'
+font-antialiasing='rgba'
+font-hinting='slight'
+# Akzentfarbe: GNOME 48 kann das nativ. Zulaessig sind blue, teal, green,
+# yellow, orange, red, pink, purple, slate. 'blue' passt zu den
+# ViperOS-Hintergruenden.
+accent-color='blue'
+clock-show-weekday=true
+clock-show-date=true
+show-battery-percentage=true
+enable-hot-corners=false
+
+[org/gnome/desktop/background]
+picture-uri='file:///usr/share/backgrounds/viperos/viperos-slate.jpg'
+picture-uri-dark='file:///usr/share/backgrounds/viperos/viperos-slate.jpg'
+picture-options='zoom'
+primary-color='#20232c'
+secondary-color='#4a5769'
+
+[org/gnome/desktop/screensaver]
+picture-uri='file:///usr/share/backgrounds/viperos/viperos-slate.jpg'
+picture-options='zoom'
+primary-color='#20232c'
+secondary-color='#4a5769'
+
+[org/gnome/desktop/wm/preferences]
+# Fensterknoepfe rechts, Titelleiste kompakt
+button-layout='appmenu:minimize,maximize,close'
+titlebar-font='Inter Bold 11'
+focus-mode='click'
+
+# ============================================================
+# Erweiterungen
+# ============================================================
+
+[org/gnome/shell]
+# UUIDs gegen metadata.json der Debian-Pakete geprueft.
+enabled-extensions=['dash-to-dock@micxgx.gmail.com', 'ubuntu-appindicators@ubuntu.com', 'blur-my-shell@aunetx', 'ding@rastersoft.com', 'user-theme@gnome-shell-extensions.gcampax.github.com']
+favorite-apps=['firefox-esr.desktop', 'org.gnome.Nautilus.desktop', 'jellystream.desktop', 'code.desktop', 'org.gnome.Terminal.desktop', 'viperos-hub.desktop']
+disable-user-extensions=false
+welcome-dialog-last-shown-version='48.0'
+
+[org/gnome/shell/extensions/user-theme]
+# Laedt /usr/share/themes/ViperOS/gnome-shell/gnome-shell.css
+name='ViperOS'
+
+[org/gnome/shell/extensions/dash-to-dock]
+dock-position='BOTTOM'
+extend-height=false
+dock-fixed=false
+autohide=true
+intellihide=true
+intellihide-mode='FOCUS_APPLICATION_WINDOWS'
+transparency-mode='DYNAMIC'
+background-opacity=0.4
+custom-background-color=true
+background-color='#1b1f2e'
+running-indicator-style='DOTS'
+show-apps-at-top=false
+show-trash=false
+show-mounts=false
+click-action='minimize-or-previews'
+scroll-action='cycle-windows'
+dash-max-icon-size=44
+custom-theme-shrink=true
+apply-custom-theme=false
+
+[org/gnome/shell/extensions/blur-my-shell]
+hacks-level=1
+[org/gnome/shell/extensions/blur-my-shell/panel]
+blur=true
+brightness=0.6
+sigma=30
+static-blur=true
+[org/gnome/shell/extensions/blur-my-shell/overview]
+blur=true
+brightness=0.6
+sigma=30
+[org/gnome/shell/extensions/blur-my-shell/dash-to-dock]
+blur=true
+brightness=0.6
+sigma=30
+[org/gnome/shell/extensions/blur-my-shell/applications]
+blur=false
+
+[org/gnome/shell/extensions/ding]
+show-home=true
+show-trash=false
+start-corner='top-left'
+icon-size='standard'
+
+# ============================================================
+# Verhalten
+# ============================================================
+
+[org/gnome/mutter]
+# Dynamische Arbeitsflaechen wie in Fedora
+dynamic-workspaces=true
+workspaces-only-on-primary=true
+edge-tiling=true
+center-new-windows=true
+attach-modal-dialogs=true
+
+[org/gnome/desktop/peripherals/touchpad]
+tap-to-click=true
+natural-scroll=true
+two-finger-scrolling-enabled=true
+
+[org/gnome/desktop/wm/keybindings]
+# Super allein oeffnet die Uebersicht (GNOME-Standard). Frueher lag hier
+# unter XFCE ein xcape-Umweg, der auf die Textkonsole sprang - unter GNOME
+# ist das nativ und braucht keine Hilfskonstruktion.
+switch-applications=['<Super>Tab']
+switch-windows=['<Alt>Tab']
+close=['<Super>q', '<Alt>F4']
+toggle-maximized=['<Super>Up']
+minimize=['<Super>h']
+switch-to-workspace-left=['<Super><Control>Left']
+switch-to-workspace-right=['<Super><Control>Right']
+
+[org/gnome/settings-daemon/plugins/media-keys]
+terminal=['<Super>t']
+home=['<Super>e']
+www=['<Super>b']
+control-center=['<Super>i']
+screensaver=['<Super>l']
+
+[org/gnome/desktop/session]
+idle-delay=uint32 600
+
+[org/gnome/settings-daemon/plugins/power]
+sleep-inactive-ac-type='nothing'
+sleep-inactive-battery-timeout=1800
+power-button-action='interactive'
+
+[org/gnome/nautilus/preferences]
+default-folder-viewer='icon-view'
+show-hidden-files=false
+[org/gnome/nautilus/icon-view]
+default-zoom-level='medium'
+
+[org/gnome/terminal/legacy]
+theme-variant='dark'
+default-show-menubar=false
+
+# Datenschutz
+[org/gnome/desktop/privacy]
+report-technical-problems=false
+send-software-usage-stats=false
+remember-recent-files=true
+
+[org/gnome/system/location]
+enabled=false
+EOF
+
+# Datenbank kompilieren. Das erzeugt /etc/dconf/db/local aus den
+# Klartextdateien und braucht weder dbus noch eine Sitzung.
+if command -v dconf >/dev/null 2>&1; then
+    dconf update
+    if [ -f /etc/dconf/db/local ]; then
+        echo "  /etc/dconf/db/local erzeugt ($(stat -c%s /etc/dconf/db/local) Bytes)"
+    else
+        echo "  WARNUNG: dconf update lief, erzeugte aber keine Datenbank"
+    fi
+else
+    echo "  WARNUNG: dconf nicht vorhanden - Vorgaben greifen nicht"
+fi
+
+echo "[ViperosOS] GNOME-Vorgaben geschrieben."

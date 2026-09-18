@@ -10,43 +10,29 @@ echo "[ViperosOS] Erstelle Branding-Assets..."
 mkdir -p /usr/share/viperos
 
 # --------------------------------------------------------
-# Dark-Glass Wallpaper in 4K
+# Hintergrundbilder
 #
-# Vorher 1920x1080: auf 1440p- und 4K-Panels sichtbar hochskaliert und
-# dadurch unscharf. 3840x2160 deckt alle gaengigen Aufloesungen ab und wird
-# nach unten sauber skaliert. Der Farbverlauf wird zusaetzlich leicht
-# gedithert, damit auf grossen Flaechen kein Banding entsteht.
+# Die Bilder liegen als echte Dateien im Repository und werden ueber
+# includes.chroot nach /usr/share/backgrounds/viperos/ kopiert - sie
+# muessen hier also nicht erzeugt werden. Frueher stand an dieser Stelle
+# ein Python-Skript, das einen Farbverlauf zeichnete; das ist durch die
+# mitgelieferten Motive ersetzt.
+#
+# Sichtbar werden sie ueber:
+#   /usr/share/gnome-background-properties/viperos.xml  (Einstellungen)
+#   /etc/dconf/db/local.d/00-viperos                    (Standardbild)
 # --------------------------------------------------------
-mkdir -p /usr/share/pixmaps /usr/share/calamares/branding/viperos /usr/share/icons/hicolor/scalable/apps
+mkdir -p /usr/share/pixmaps /usr/share/calamares/branding/viperos          /usr/share/icons/hicolor/scalable/apps /usr/share/viperos
 
-python3 << 'PYEOF' || echo "[ViperosOS] WARNUNG: Wallpaper-Erzeugung fehlgeschlagen"
-import random
-from PIL import Image, ImageDraw
-
-W, H = 3840, 2160
-img = Image.new('RGB', (W, H), (10, 15, 26))
-draw = ImageDraw.Draw(img)
-
-# Vertikaler Verlauf #0a0f1a -> #162b4b, pro Zeile leicht gedithert
-random.seed(1)
-for y in range(H):
-    t = y / H
-    r = 10 + (22 - 10) * t
-    g = 15 + (43 - 15) * t
-    b = 26 + (75 - 26) * t
-    d = random.uniform(-0.6, 0.6)
-    draw.line([(0, y), (W, y)],
-              fill=(max(0, min(255, int(r + d))),
-                    max(0, min(255, int(g + d))),
-                    max(0, min(255, int(b + d)))))
-
-# Geometrische Akzentflaechen (Koordinaten auf 4K skaliert)
-draw.polygon([(0, H), (W, int(H * 0.648)), (W, H)], fill=(16, 28, 50))
-draw.polygon([(0, H), (int(W * 0.625), H), (0, int(H * 0.37))], fill=(14, 38, 70))
-
-img.save('/usr/share/viperos/wallpaper.png', optimize=True)
-print('Wallpaper 3840x2160 erstellt.')
-PYEOF
+if [ -d /usr/share/backgrounds/viperos ]; then
+    count=$(find /usr/share/backgrounds/viperos -type f \( -name '*.jpg' -o -name '*.png' \) | wc -l)
+    echo "  Hintergrundbilder gefunden: $count"
+    # Symlink fuer Stellen, die einen festen Pfad erwarten (GRUB, Calamares).
+    first=/usr/share/backgrounds/viperos/viperos-slate.jpg
+    [ -f "$first" ] && ln -sf "$first" /usr/share/viperos/wallpaper.jpg
+else
+    echo "  WARNUNG: /usr/share/backgrounds/viperos fehlt"
+fi
 
 # --------------------------------------------------------
 # Logo als SVG: skaliert verlustfrei auf jede Groesse, anders als die
@@ -99,9 +85,6 @@ for path, size in [
 print('Logos aus 768px-Quelle gerendert.')
 PYEOF
 
-# wallpaper.jpg wird von lightdm-gtk-greeter.conf referenziert.
-ln -sf /usr/share/viperos/wallpaper.png /usr/share/viperos/wallpaper.jpg 2>/dev/null || true
-
 # --------------------------------------------------------
 # OS-Release Informationen
 # --------------------------------------------------------
@@ -149,7 +132,7 @@ GRUB_TIMEOUT=5
 GRUB_DISTRIBUTOR="ViperOS"
 GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
 GRUB_CMDLINE_LINUX=""
-GRUB_BACKGROUND="/usr/share/viperos/wallpaper.png"
+GRUB_BACKGROUND="/usr/share/backgrounds/viperos/viperos-slate.jpg"
 GRUB_GFXMODE="1920x1080,1280x720,auto"
 GRUB_GFXPAYLOAD_LINUX=keep
 EOF

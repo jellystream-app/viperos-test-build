@@ -48,33 +48,20 @@ if [ -f /etc/calamares/settings.conf ]; then
 fi
 
 # ----------------------------------------------------------------------
-# polkit-Authentication-Agent erzwingen
+# Hinweis: Authentication Agent
 #
 # "pkexec calamares" zeigt nur dann einen Passwortdialog, wenn in der
-# Sitzung ein Authentication Agent laeuft. Ohne Agent passiert beim Klick
-# auf "ViperOS installieren" GAR NICHTS - der Knopf wirkt kaputt.
+# Sitzung ein polkit-Agent laeuft. Unter XFCE fehlte einer, weshalb hier
+# frueher lxpolkit samt eigenem Autostart eingerichtet wurde.
 #
-# lxpolkit liefert zwar selbst einen Autostart, dieser enthaelt aber
-#   NotShowIn=GNOME;KDE;MATE;LXQt;XFCE;Unity;X-Cinnamon;
-# - XFCE ist ausdruecklich ausgeschlossen, weil dort normalerweise
-# xfce-polkit einspringt. Das Paket gibt es in Trixie nicht mehr, also
-# wird der Autostart hier durch eine eigene Fassung ohne NotShowIn
-# ersetzt.
+# Unter GNOME ist der Agent Teil der Shell: gnome-shell deklariert
+# "Provides: polkit-1-auth-agent" und startet ihn mit der Sitzung. Ein
+# zweiter Agent wuerde nur mit der Shell um die Registrierung am Systembus
+# konkurrieren, deshalb wird hier keiner mehr eingerichtet.
+#
+# Calamares laeuft unter Wayland als X11-Client ueber XWayland; die
+# polkit-Policy erlaubt das ausdruecklich (allow_gui=true).
 # ----------------------------------------------------------------------
-mkdir -p /etc/xdg/autostart
-cat > /etc/xdg/autostart/lxpolkit.desktop << 'EOF'
-[Desktop Entry]
-Type=Application
-Name=PolicyKit Authentication Agent
-Comment=Fragt nach Berechtigungen, wenn ein Programm Administratorrechte braucht
-Exec=lxpolkit
-TryExec=lxpolkit
-Icon=gtk-dialog-authentication
-Terminal=false
-NoDisplay=true
-X-GNOME-Autostart-enabled=true
-OnlyShowIn=XFCE;
-EOF
 
 # Der Installer laeuft ueber pkexec; die Policy dafuer liefert calamares
 # selbst (/usr/share/polkit-1/actions/com.github.calamares.calamares.policy).

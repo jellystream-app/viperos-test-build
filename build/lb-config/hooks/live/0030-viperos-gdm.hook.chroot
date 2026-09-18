@@ -1,0 +1,109 @@
+#!/bin/bash
+# ViperosOS - GDM-Anmeldebildschirm
+#
+# Ersetzt den frueheren LightDM-Hook. GDM ist der Anmeldemanager von GNOME
+# und der einzige, der die Shell-Sitzung samt Wayland sauber startet.
+#
+# Autologin fuer die Live-Sitzung uebernimmt live-config (Komponente
+# 0080-gdm3): sie traegt AutomaticLogin in /etc/gdm3/daemon.conf ein,
+# sobald das System vom Live-Medium startet. Deshalb wird hier NICHT
+# fest auf "viperos" gesetzt - sonst stuende nach der Installation ein
+# Autologin auf einen Benutzer, den es dort nicht gibt.
+
+set -e
+
+echo "[ViperosOS] Konfiguriere GDM..."
+
+mkdir -p /etc/gdm3
+
+# Wayland bleibt aktiv (Standard in Trixie). Bei Grafikproblemen kann der
+# Nutzer am Anmeldebildschirm ueber das Zahnrad "GNOME auf Xorg" waehlen -
+# diese Sitzung ist vorhanden, weil xserver-xorg im Image ist.
+if [ -f /etc/gdm3/daemon.conf ]; then
+    # Debug-Ausgaben aus, sonst fuellt GDM das Journal.
+    sed -i 's/^#\?Enable=true/#Enable=true/' /etc/gdm3/daemon.conf || true
+fi
+
+# ----------------------------------------------------------------------
+# Aussehen des Anmeldebildschirms
+#
+# GDM laedt sein Erscheinungsbild aus einer gresource-Datei, die sich nicht
+# ohne Weiteres ersetzen laesst. Zwei Dinge gehen aber sauber:
+#   1. dconf-Vorgaben fuer den gdm-Benutzer (Schrift, Symbole, Uhr)
+#   2. ein Hintergrundbild ueber die Shell-CSS des greeter
+# ----------------------------------------------------------------------
+mkdir -p /etc/dconf/profile /etc/dconf/db/gdm.d
+
+cat > /etc/dconf/profile/gdm << 'EOF'
+user-db:user
+system-db:gdm
+file-db:/usr/share/gdm/greeter-dconf-defaults
+EOF
+
+cat > /etc/dconf/db/gdm.d/00-viperos << 'EOF'
+[org/gnome/desktop/interface]
+color-scheme='prefer-dark'
+gtk-theme='Adwaita-dark'
+icon-theme='Papirus-Dark'
+cursor-theme='Adwaita'
+font-name='Inter 11'
+clock-show-weekday=true
+clock-show-date=true
+show-battery-percentage=true
+
+[org/gnome/login-screen]
+# Kein GNOME-Logo auf dem Anmeldebildschirm; stattdessen ViperOS.
+logo='/usr/share/icons/hicolor/scalable/apps/viperos.svg'
+banner-message-enable=true
+banner-message-text='ViperOS'
+disable-user-list=false
+enable-fingerprint-authentication=false
+
+[org/gnome/desktop/background]
+picture-uri='file:///usr/share/backgrounds/viperos/viperos-slate.jpg'
+picture-uri-dark='file:///usr/share/backgrounds/viperos/viperos-slate.jpg'
+picture-options='zoom'
+
+[org/gnome/settings-daemon/plugins/power]
+sleep-inactive-ac-type='nothing'
+EOF
+
+if command -v dconf >/dev/null 2>&1; then
+    dconf update
+    [ -f /etc/dconf/db/gdm ] && echo "  /etc/dconf/db/gdm erzeugt" || echo "  WARNUNG: gdm-Datenbank fehlt"
+fi
+
+# ----------------------------------------------------------------------
+# Hintergrundbild fuer den Anmeldebildschirm
+#
+# Der greeter laedt zusaetzlich zu seinem eingebauten Stylesheet die Datei
+# /etc/gdm3/greeter.dconf-defaults nicht fuer Bilder - dafuer wird die
+# Shell-CSS des gdm-Themes ergaenzt.
+# ----------------------------------------------------------------------
+mkdir -p /usr/share/themes/ViperOS/gnome-shell
+cat > /usr/share/gnome-shell/gdm-viperos.css << 'EOF'
+/* ViperOS: Hintergrund des Anmeldebildschirms */
+#lockDialogGroup {
+  background: #12151f url(file:///usr/share/backgrounds/viperos/viperos-slate.jpg);
+  background-size: cover;
+  background-position: center;
+}
+EOF
+
+# GDM als Standard-Anmeldemanager eintragen.
+echo "/usr/sbin/gdm3" > /etc/X11/default-display-manager 2>/dev/null || true
+systemctl enable gdm3 2>/dev/null || true
+# Symlink direkt setzen: systemctl scheitert im Chroot ohne laufenden
+# systemd, und "|| true" wuerde das verschlucken.
+mkdir -p /etc/systemd/system
+if [ -f /lib/systemd/system/gdm3.service ]; then
+    ln -sf /lib/systemd/system/gdm3.service /etc/systemd/system/display-manager.service
+    echo "  display-manager.service -> gdm3"
+elif [ -f /usr/lib/systemd/system/gdm3.service ]; then
+    ln -sf /usr/lib/systemd/system/gdm3.service /etc/systemd/system/display-manager.service
+    echo "  display-manager.service -> gdm3"
+else
+    echo "  WARNUNG: gdm3.service nicht gefunden"
+fi
+
+echo "[ViperosOS] GDM konfiguriert."

@@ -28,3 +28,7 @@ scripts/.*.py
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Quellordner fuer Wallpaper-Uploads; die Bilder liegen bereits unter
+# build/lb-config/includes.chroot/usr/share/backgrounds/viperos/
+wallpaper-upload/
