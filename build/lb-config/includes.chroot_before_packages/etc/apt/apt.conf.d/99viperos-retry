@@ -1,0 +1,31 @@
+// ViperOS - apt gegen Aussetzer der Debian-Spiegel absichern
+//
+// Ein Build zog ~1700 Pakete; beim Holen von python3-packaging brach die
+// Verbindung zum CDN ab ("OpenSSL system call error: Broken pipe"), obwohl
+// die Datei erreichbar war. live-build uebergibt zwar selbst schon
+// "--yes -o Acquire::Retries=5", das reichte aber nicht: die Retries greifen
+// nur fuer den apt-get-Aufruf der Paketliste, nicht fuer jeden Download im
+// Chroot, und 5 Versuche in schneller Folge treffen denselben CDN-Knoten.
+//
+// Diese Datei wird ueber includes.chroot_before_packages installiert und gilt
+// damit fuer JEDEN apt-Aufruf im Chroot - auch fuer die der Hooks.
+
+Acquire::Retries "10";
+Acquire::Retries::Delay::Maximum "30";
+
+// Grosszuegige Zeitlimits: das CDN antwortet unter Last manchmal langsam.
+Acquire::http::Timeout "120";
+Acquire::https::Timeout "120";
+Acquire::ftp::Timeout "120";
+
+// Pipelining aus. Das ist der eigentliche Hebel gegen den beobachteten
+// Fehler: apt fragt per Default mehrere Dateien ueber eine Verbindung an;
+// bricht die ab, gehen alle darin offenen Anfragen auf einmal verloren.
+// Ohne Pipelining betrifft ein Abbruch nur eine Datei, die dann erneut
+// geholt wird. Kostet etwas Geschwindigkeit, erspart aber den Neubau.
+Acquire::http::Pipeline-Depth "0";
+Acquire::https::Pipeline-Depth "0";
+
+// Hinweis: ForceIPv4 waere hier wirkungslos - die abgebrochene Verbindung
+// ging bereits an eine IPv4-Adresse (146.75.30.132). Deshalb bewusst nicht
+// gesetzt, um keine falsche Sicherheit zu suggerieren.

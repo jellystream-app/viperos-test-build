@@ -281,6 +281,21 @@ jobs:
                 grub2-common mtools dosfstools rsync wget curl git \
                 python3 ca-certificates
 
+              # apt gegen Aussetzer des Debian-CDN absichern. Ein einzelner
+              # Verbindungsabbruch beim Holen eines von ~1700 Paketen liess den
+              # Build sonst nach 25 Minuten sterben ("Broken pipe" beim
+              # Herunterladen, obwohl die Datei erreichbar ist).
+              # Zeilenweise statt Here-Doc: ein Here-Doc muesste hier auf
+              # Spalte 0 stehen und wuerde damit aus dem YAML-Block ausbrechen.
+              {
+                echo "Acquire::Retries \"10\";"
+                echo "Acquire::Retries::Delay::Maximum \"30\";"
+                echo "Acquire::http::Timeout \"120\";"
+                echo "Acquire::https::Timeout \"120\";"
+                echo "Acquire::http::Pipeline-Depth \"0\";"
+                echo "Acquire::https::Pipeline-Depth \"0\";"
+              } > /etc/apt/apt.conf.d/99viperos-retry
+
               mkdir -p /build && cd /build
               cp -a /src/build/lb-config/. /build/
 
@@ -292,7 +307,7 @@ jobs:
                    -o -name "build" -o -name "clean" \) -exec sed -i "s/\r$//" {} +
 
               mkdir -p config
-              for c in hooks package-lists includes.chroot; do
+              for c in hooks package-lists includes.chroot includes.chroot_before_packages; do
                 [ -d "$c" ] || continue
                 rm -rf "config/$c"; cp -a "$c" "config/$c"
               done

@@ -42,12 +42,19 @@ cd "$BUILD_DIR"
 
 # Konfiguration kopieren
 log "Kopiere live-build Konfiguration..."
-mkdir -p auto config/package-lists config/hooks/live config/includes.chroot
+mkdir -p auto config/package-lists config/hooks/live config/includes.chroot \
+         config/includes.chroot_before_packages
 
 cp -r "${WIN_PROJECT}/build/lb-config/auto/." "${BUILD_DIR}/auto/"
 cp -r "${WIN_PROJECT}/build/lb-config/package-lists/." "${BUILD_DIR}/config/package-lists/"
 cp -r "${WIN_PROJECT}/build/lb-config/hooks/." "${BUILD_DIR}/config/hooks/"
 cp -r "${WIN_PROJECT}/build/lb-config/includes.chroot/." "${BUILD_DIR}/config/includes.chroot/"
+# apt-Absicherung (99viperos-retry) - muss VOR der Paketinstallation im
+# Chroot liegen, sonst greifen die Retry-Einstellungen nicht.
+if [ -d "${WIN_PROJECT}/build/lb-config/includes.chroot_before_packages" ]; then
+    cp -r "${WIN_PROJECT}/build/lb-config/includes.chroot_before_packages/." \
+          "${BUILD_DIR}/config/includes.chroot_before_packages/"
+fi
 
 # Hooks ausführbar machen
 find "${BUILD_DIR}/config/hooks/" -name "*.hook.chroot" -exec chmod +x {} \;

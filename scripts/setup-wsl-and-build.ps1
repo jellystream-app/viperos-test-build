@@ -358,7 +358,7 @@ $buildScript = @'
 set -eu
 cd /build/viperos
 mkdir -p config
-for component in hooks package-lists includes.chroot; do
+for component in hooks package-lists includes.chroot includes.chroot_before_packages; do
     [ -d "$component" ] || continue
     rm -rf "config/$component"
     cp -a "$component" "config/$component"

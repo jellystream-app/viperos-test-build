@@ -31,7 +31,7 @@ OUTPUT_DIR="/output"
 cd "$BUILD_DIR"
 
 mkdir -p config
-for component in hooks package-lists includes.chroot; do
+for component in hooks package-lists includes.chroot includes.chroot_before_packages; do
     if [ -d "$component" ]; then
         rm -rf "config/$component"
         cp -a "$component" "config/$component"
