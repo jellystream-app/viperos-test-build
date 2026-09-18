@@ -1,14 +1,24 @@
 #!/bin/bash
 # ViperosOS - GDM-Anmeldebildschirm
 #
-# Ersetzt den frueheren LightDM-Hook. GDM ist der Anmeldemanager von GNOME
-# und der einzige, der die Shell-Sitzung samt Wayland sauber startet.
+# WICHTIG - das war zuvor falsch:
+# Der Hook schrieb nach /etc/dconf/db/gdm.d/ und legte ein eigenes
+# /etc/dconf/profile/gdm an. GDM benutzt aber eine DATEI-Datenbank:
 #
-# Autologin fuer die Live-Sitzung uebernimmt live-config (Komponente
-# 0080-gdm3): sie traegt AutomaticLogin in /etc/gdm3/daemon.conf ein,
-# sobald das System vom Live-Medium startet. Deshalb wird hier NICHT
-# fest auf "viperos" gesetzt - sonst stuende nach der Installation ein
-# Autologin auf einen Benutzer, den es dort nicht gibt.
+#   /usr/share/dconf/profile/gdm:
+#       user-db:user
+#       file-db:/var/lib/gdm3/greeter-dconf-defaults
+#
+# und /usr/share/gdm/generate-config (laeuft als ExecStartPre der
+# gdm.service) baut diese Datei bei JEDEM Start neu aus
+# /usr/share/gdm/dconf/. Einstellungen in /etc/dconf/db/gdm.d/ landen
+# dort nie - der Anmeldebildschirm blieb deshalb unveraendert.
+#
+# Richtig ist /etc/gdm3/greeter.dconf-defaults: Debian verlinkt diese
+# Datei bereits als /usr/share/gdm/dconf/90-debian-settings, sie wird
+# also automatisch mitkompiliert.
+#
+# Autologin fuer die Live-Sitzung uebernimmt live-config (0080-gdm3).
 
 set -e
 
@@ -16,31 +26,16 @@ echo "[ViperosOS] Konfiguriere GDM..."
 
 mkdir -p /etc/gdm3
 
-# Wayland bleibt aktiv (Standard in Trixie). Bei Grafikproblemen kann der
-# Nutzer am Anmeldebildschirm ueber das Zahnrad "GNOME auf Xorg" waehlen -
-# diese Sitzung ist vorhanden, weil xserver-xorg im Image ist.
-if [ -f /etc/gdm3/daemon.conf ]; then
-    # Debug-Ausgaben aus, sonst fuellt GDM das Journal.
-    sed -i 's/^#\?Enable=true/#Enable=true/' /etc/gdm3/daemon.conf || true
-fi
-
 # ----------------------------------------------------------------------
 # Aussehen des Anmeldebildschirms
-#
-# GDM laedt sein Erscheinungsbild aus einer gresource-Datei, die sich nicht
-# ohne Weiteres ersetzen laesst. Zwei Dinge gehen aber sauber:
-#   1. dconf-Vorgaben fuer den gdm-Benutzer (Schrift, Symbole, Uhr)
-#   2. ein Hintergrundbild ueber die Shell-CSS des greeter
 # ----------------------------------------------------------------------
-mkdir -p /etc/dconf/profile /etc/dconf/db/gdm.d
+cat > /etc/gdm3/greeter.dconf-defaults << 'EOF'
+# ViperOS - Vorgaben fuer den Anmeldebildschirm
+#
+# Diese Datei ist via /usr/share/gdm/dconf/90-debian-settings verlinkt und
+# wird von generate-config in /var/lib/gdm3/greeter-dconf-defaults
+# kompiliert - der Datenbank, die GDMs dconf-Profil liest.
 
-cat > /etc/dconf/profile/gdm << 'EOF'
-user-db:user
-system-db:gdm
-file-db:/usr/share/gdm/greeter-dconf-defaults
-EOF
-
-cat > /etc/dconf/db/gdm.d/00-viperos << 'EOF'
 [org/gnome/desktop/interface]
 color-scheme='prefer-dark'
 gtk-theme='Adwaita-dark'
@@ -52,36 +47,52 @@ clock-show-date=true
 show-battery-percentage=true
 
 [org/gnome/login-screen]
-# Kein GNOME-Logo auf dem Anmeldebildschirm; stattdessen ViperOS.
-logo='/usr/share/icons/hicolor/scalable/apps/viperos.svg'
-banner-message-enable=true
-banner-message-text='ViperOS'
+# Kein Debian-Logo: der Schluessel bleibt leer, damit gar keines erscheint.
+# (Ein eigenes Logo waere moeglich, wirkt auf dem Anmeldebildschirm neben
+#  dem Benutzerbild aber gedraengt.)
+logo=''
+banner-message-enable=false
 disable-user-list=false
+disable-restart-buttons=false
 enable-fingerprint-authentication=false
+enable-smartcard-authentication=false
 
 [org/gnome/desktop/background]
 picture-uri='file:///usr/share/backgrounds/viperos/viperos-slate.jpg'
 picture-uri-dark='file:///usr/share/backgrounds/viperos/viperos-slate.jpg'
 picture-options='zoom'
+primary-color='#20232c'
+secondary-color='#4a5769'
 
 [org/gnome/settings-daemon/plugins/power]
 sleep-inactive-ac-type='nothing'
+
+[org/gnome/shell]
+# Der Anmeldebildschirm laedt keine Erweiterungen des Benutzers.
+enabled-extensions=[]
 EOF
 
-if command -v dconf >/dev/null 2>&1; then
-    dconf update
-    [ -f /etc/dconf/db/gdm ] && echo "  /etc/dconf/db/gdm erzeugt" || echo "  WARNUNG: gdm-Datenbank fehlt"
+# Die Datei wird beim GDM-Start automatisch kompiliert. Im Chroot laesst
+# sich das vorwegnehmen, damit die Datenbank schon im Image liegt.
+if command -v dconf >/dev/null 2>&1 && [ -d /usr/share/gdm/dconf ]; then
+    mkdir -p /var/lib/gdm3
+    if dconf compile /var/lib/gdm3/greeter-dconf-defaults /usr/share/gdm/dconf 2>/dev/null; then
+        echo "  greeter-dconf-defaults vorkompiliert ($(stat -c%s /var/lib/gdm3/greeter-dconf-defaults) Bytes)"
+        chown Debian-gdm:Debian-gdm /var/lib/gdm3/greeter-dconf-defaults 2>/dev/null || true
+    else
+        echo "  (Vorkompilierung uebersprungen - generate-config macht es beim Start)"
+    fi
 fi
 
 # ----------------------------------------------------------------------
-# Hintergrundbild fuer den Anmeldebildschirm
+# Das ViperOS-Shell-Theme auch auf dem Anmeldebildschirm verwenden.
 #
-# Der greeter laedt zusaetzlich zu seinem eingebauten Stylesheet die Datei
-# /etc/gdm3/greeter.dconf-defaults nicht fuer Bilder - dafuer wird die
-# Shell-CSS des gdm-Themes ergaenzt.
+# GDM laedt sein Stylesheet aus der gresource der Shell, nicht aus
+# /usr/share/themes. Ueber die Datei unten laesst sich der Hintergrund
+# des Anmeldedialogs aber ergaenzen.
 # ----------------------------------------------------------------------
-mkdir -p /usr/share/themes/ViperOS/gnome-shell
-cat > /usr/share/gnome-shell/gdm-viperos.css << 'EOF'
+mkdir -p /usr/share/gnome-shell/theme
+cat > /usr/share/gnome-shell/theme/viperos-gdm.css << 'EOF'
 /* ViperOS: Hintergrund des Anmeldebildschirms */
 #lockDialogGroup {
   background: #12151f url(file:///usr/share/backgrounds/viperos/viperos-slate.jpg);
@@ -90,20 +101,18 @@ cat > /usr/share/gnome-shell/gdm-viperos.css << 'EOF'
 }
 EOF
 
-# GDM als Standard-Anmeldemanager eintragen.
+# ----------------------------------------------------------------------
+# GDM als Anmeldemanager eintragen. systemctl scheitert im Chroot ohne
+# laufenden systemd, deshalb wird der Symlink direkt gesetzt.
+# ----------------------------------------------------------------------
 echo "/usr/sbin/gdm3" > /etc/X11/default-display-manager 2>/dev/null || true
-systemctl enable gdm3 2>/dev/null || true
-# Symlink direkt setzen: systemctl scheitert im Chroot ohne laufenden
-# systemd, und "|| true" wuerde das verschlucken.
 mkdir -p /etc/systemd/system
-if [ -f /lib/systemd/system/gdm3.service ]; then
-    ln -sf /lib/systemd/system/gdm3.service /etc/systemd/system/display-manager.service
-    echo "  display-manager.service -> gdm3"
-elif [ -f /usr/lib/systemd/system/gdm3.service ]; then
-    ln -sf /usr/lib/systemd/system/gdm3.service /etc/systemd/system/display-manager.service
-    echo "  display-manager.service -> gdm3"
-else
-    echo "  WARNUNG: gdm3.service nicht gefunden"
-fi
+for base in /lib/systemd/system /usr/lib/systemd/system; do
+    if [ -f "$base/gdm3.service" ]; then
+        ln -sf "$base/gdm3.service" /etc/systemd/system/display-manager.service
+        echo "  display-manager.service -> gdm3"
+        break
+    fi
+done
 
 echo "[ViperosOS] GDM konfiguriert."

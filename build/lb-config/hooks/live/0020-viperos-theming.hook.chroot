@@ -1,487 +1,65 @@
 #!/bin/bash
-# ViperosOS - eigenes GNOME-Shell-Theme
+# ViperosOS - GNOME-Shell-Theme zusammensetzen
 #
-# Ziel: die Struktur von GNOME (Uebersicht, Dash, Workspaces) behalten, das
-# Aussehen aber eigenstaendig machen. Geladen wird das Theme von der
-# Erweiterung user-theme, die in Hook 0025 auf 'ViperOS' gesetzt wird.
+# WICHTIG - das war zuvor falsch:
+# Die user-theme-Extension ruft Main.setThemeStylesheet(pfad) auf. GNOME
+# laedt sein eigenes Stylesheet nur, wenn KEINES gesetzt ist. Ein eigenes
+# Theme ERSETZT also die kompletten 174 KB Standardregeln, es ergaenzt sie
+# nicht. Ein 9-KB-Theme liess dadurch ~165 KB Regeln weg: Topbar, Menues
+# und Uebersicht fielen auf St-Voreinstellungen zurueck - sichtbar als
+# "nur ein Balken ohne Rundung".
 #
-# Die Farben sind aus den mitgelieferten Hintergruenden abgeleitet, damit
-# Leiste und Fenster zum Bild passen:
-#   #12151f  Grund (dunkler als der Hintergrund, damit er sich absetzt)
-#   #1b1f2e  Flaechen (Panel, Dash, Popups)
-#   #252b3d  erhoehte Flaechen (Menueeintraege, Karten)
-#   #6a8fd8  Akzent (Auswahl, Fokus, aktive Elemente)
-#   #e7eef9  Text
-#   #8ea3c0  Text gedaempft
+# Richtig ist: GNOMEs Standard-CSS als Basis nehmen und die eigenen Regeln
+# ANHAENGEN. Spaetere Regeln gewinnen in CSS, also ueberschreiben unsere
+# genau das, was sie ansprechen - der Rest bleibt vollstaendig erhalten.
+# Ubuntu macht es mit Yaru genauso; deshalb ist auch Yaru ~180 KB gross.
+#
+# gnome-shell-base.css und viperos-overrides.css kommen ueber
+# includes.chroot ins Image; hier werden sie nur verbunden.
 
 set -e
 
-echo "[ViperosOS] Erstelle GNOME-Shell-Theme..."
-
-THEME=/usr/share/themes/ViperOS
-mkdir -p "$THEME/gnome-shell"
-
-cat > "$THEME/gnome-shell/gnome-shell.css" << 'CSSEOF'
-/* ============================================================
-   ViperOS - GNOME Shell Theme
-   Basiert auf Adwaita-dark, ueberschreibt Farben und Rundungen.
-   ============================================================ */
-
-/* ---------- Grundlagen ---------- */
-stage {
-  font-family: Inter, "Noto Sans", sans-serif;
-  font-size: 11pt;
-  color: #e7eef9;
-}
-
-/* ---------- Obere Leiste ----------
-   Schwebend statt randlos: Fedora und Standard-GNOME ziehen die Leiste
-   ueber die volle Breite bis an die Bildschirmkante. Hier sitzt sie mit
-   Abstand und abgerundeten Ecken - der auffaelligste Unterschied beim
-   ersten Blick.                                                        */
-#panel {
-  background-color: rgba(18, 21, 31, 0.88);
-  font-weight: 600;
-  height: 36px;
-  margin: 6px 8px 0 8px;
-  border-radius: 14px;
-  border: 1px solid rgba(106, 143, 216, 0.18);
-}
-
-#panel:overview {
-  background-color: rgba(18, 21, 31, 0.45);
-  border-color: rgba(106, 143, 216, 0.10);
-}
-
-/* Die Ecken, die GNOME normalerweise unten an der Leiste zeichnet,
-   stoeren bei einer schwebenden Leiste. */
-#panel .panel-corner {
-  -panel-corner-radius: 0;
-  -panel-corner-background-color: transparent;
-  -panel-corner-border-color: transparent;
-}
-
-#panel .panel-button {
-  color: #d4dff0;
-  border-radius: 10px;
-  margin: 4px 2px;
-  padding: 0 11px;
-  transition-duration: 150ms;
-}
-
-#panel .panel-button:hover {
-  background-color: rgba(106, 143, 216, 0.18);
-  color: #ffffff;
-}
-
-#panel .panel-button:active,
-#panel .panel-button:checked,
-#panel .panel-button:focus {
-  background-color: rgba(106, 143, 216, 0.30);
-  color: #ffffff;
-}
-
-#panel .panel-button .system-status-icon {
-  icon-size: 16px;
-  padding: 0 2px;
-}
-
-/* Uhr mittig hervorheben */
-#panel #panelCenter .panel-button {
-  font-weight: 600;
-  color: #ffffff;
-}
-
-/* ---------- Menues und Popups ---------- */
-.popup-menu {
-  color: #e7eef9;
-}
-
-.popup-menu-boxpointer,
-.candidate-popup-boxpointer {
-  -arrow-border-radius: 16px;
-  -arrow-background-color: rgba(27, 31, 46, 0.97);
-  -arrow-border-color: rgba(106, 143, 216, 0.22);
-  -arrow-border-width: 1px;
-  -arrow-base: 0;
-  -arrow-rise: 0;
-  -boxpointer-gap: 6px;
-}
-
-.popup-menu-content {
-  padding: 8px;
-  border-radius: 16px;
-}
-
-.popup-menu-item {
-  border-radius: 10px;
-  padding: 8px 12px;
-  spacing: 10px;
-}
-
-.popup-menu-item:hover,
-.popup-menu-item:focus {
-  background-color: rgba(106, 143, 216, 0.22);
-}
-
-.popup-menu-item:active {
-  background-color: #6a8fd8;
-  color: #0e1119;
-}
-
-.popup-separator-menu-item {
-  background-color: transparent;
-}
-
-.popup-separator-menu-item .popup-separator-menu-item-separator {
-  background-color: rgba(142, 163, 192, 0.20);
-  height: 1px;
-}
-
-/* Schnelleinstellungen (Lautstaerke, WLAN, Akku) */
-.quick-settings {
-  padding: 14px;
-  border-radius: 18px;
-}
-
-.quick-toggle {
-  background-color: #252b3d;
-  border-radius: 14px;
-  color: #e7eef9;
-  min-height: 46px;
-}
-
-.quick-toggle:checked,
-.quick-toggle:checked:hover {
-  background-color: #6a8fd8;
-  color: #0e1119;
-}
-
-.quick-toggle:hover {
-  background-color: #2e364c;
-}
-
-.quick-slider .slider {
-  color: #6a8fd8;
-  -barlevel-background-color: #252b3d;
-  -barlevel-active-background-color: #6a8fd8;
-  -barlevel-height: 5px;
-  -barlevel-border-radius: 999px;
-}
-
-/* ---------- Uebersicht ---------- */
-#overviewGroup {
-  background-color: rgba(14, 17, 25, 0.35);
-}
-
-.workspace-thumbnails {
-  spacing: 8px;
-  padding: 8px;
-}
-
-.workspace-thumbnail {
-  border-radius: 10px;
-}
-
-.workspace-thumbnail-indicator {
-  border: 2px solid #6a8fd8;
-  border-radius: 10px;
-}
-
-.window-picker {
-  spacing: 16px;
-}
-
-.window-clone-border {
-  border: 2px solid rgba(106, 143, 216, 0.85);
-  border-radius: 12px;
-}
-
-.window-caption {
-  background-color: rgba(27, 31, 46, 0.92);
-  border-radius: 999px;
-  color: #e7eef9;
-  padding: 5px 14px;
-  font-weight: 600;
-}
-
-/* Suchfeld */
-#searchEntry {
-  background-color: rgba(37, 43, 61, 0.92);
-  border: 1px solid rgba(106, 143, 216, 0.20);
-  border-radius: 999px;
-  color: #e7eef9;
-  padding: 9px 18px;
-  width: 340px;
-}
-
-#searchEntry:focus {
-  border-color: #6a8fd8;
-  box-shadow: inset 0 0 0 1px rgba(106, 143, 216, 0.55);
-}
-
-#searchEntry StIcon.capslock-warning {
-  icon-size: 16px;
-}
-
-.search-section-content {
-  background-color: rgba(27, 31, 46, 0.85);
-  border-radius: 16px;
-  padding: 12px;
-}
-
-.search-provider-icon:hover,
-.list-search-result:hover {
-  background-color: rgba(106, 143, 216, 0.20);
-  border-radius: 12px;
-}
-
-/* ---------- Anwendungsraster ---------- */
-.app-well-app .overview-icon,
-.app-grid .overview-icon,
-.grid-search-result .overview-icon {
-  border-radius: 14px;
-  padding: 10px;
-  color: #e7eef9;
-  transition-duration: 150ms;
-}
-
-.app-well-app:hover .overview-icon,
-.app-grid .overview-icon:hover,
-.grid-search-result:hover .overview-icon {
-  background-color: rgba(106, 143, 216, 0.20);
-}
-
-.app-well-app:active .overview-icon,
-.app-well-app:checked .overview-icon {
-  background-color: rgba(106, 143, 216, 0.34);
-}
-
-.app-folder-dialog {
-  background-color: rgba(27, 31, 46, 0.97);
-  border: 1px solid rgba(106, 143, 216, 0.22);
-  border-radius: 20px;
-}
-
-.page-indicator .page-indicator-icon {
-  background-color: rgba(142, 163, 192, 0.35);
-}
-
-.page-indicator:checked .page-indicator-icon {
-  background-color: #6a8fd8;
-}
-
-/* ---------- Dash / Dock ----------
-   Stark abgerundet und schwebend - zusammen mit der Topbar ergibt das
-   eine erkennbar eigene Silhouette statt der GNOME-Standardform.      */
-#dash {
-  background-color: rgba(18, 21, 31, 0.62);
-  border: 1px solid rgba(106, 143, 216, 0.18);
-  border-radius: 22px;
-  padding: 7px;
-  margin-bottom: 10px;
-}
-
-/* dash-to-dock nutzt eigene Klassen; gleiche Form auch dort. */
-#dashtodockContainer .dash-background,
-#dashtodockContainer #dash {
-  background-color: rgba(18, 21, 31, 0.62);
-  border: 1px solid rgba(106, 143, 216, 0.18);
-  border-radius: 22px;
-  padding: 7px;
-}
-
-#dash .placeholder {
-  background-image: none;
-}
-
-.dash-item-container .app-well-app .overview-icon {
-  border-radius: 13px;
-}
-
-.dash-separator {
-  background-color: rgba(142, 163, 192, 0.22);
-  width: 1px;
-  margin: 0 6px;
-}
-
-/* ---------- Benachrichtigungen ---------- */
-.message {
-  background-color: rgba(37, 43, 61, 0.95);
-  border-radius: 14px;
-  color: #e7eef9;
-  margin: 4px 0;
-}
-
-.message:hover {
-  background-color: rgba(46, 54, 76, 0.97);
-}
-
-.message-title {
-  font-weight: 700;
-  color: #ffffff;
-}
-
-.message-content {
-  color: #a9b8ce;
-}
-
-.message-media-control:hover {
-  background-color: rgba(106, 143, 216, 0.22);
-  border-radius: 999px;
-}
-
-.datemenu-today-button,
-.datemenu-displays-box {
-  border-radius: 14px;
-}
-
-.calendar {
-  border-radius: 14px;
-  padding: 8px;
-}
-
-.calendar-today {
-  background-color: #6a8fd8;
-  color: #0e1119;
-  font-weight: 800;
-  border-radius: 999px;
-}
-
-.calendar-day-base:hover {
-  background-color: rgba(106, 143, 216, 0.22);
-  border-radius: 999px;
-}
-
-.calendar-day-base:selected {
-  background-color: rgba(106, 143, 216, 0.40);
-  border-radius: 999px;
-}
-
-/* ---------- Dialoge ---------- */
-.modal-dialog {
-  background-color: rgba(27, 31, 46, 0.98);
-  border: 1px solid rgba(106, 143, 216, 0.22);
-  border-radius: 18px;
-  color: #e7eef9;
-}
-
-.modal-dialog-linked-button {
-  background-color: #252b3d;
-  border: none;
-  color: #e7eef9;
-  font-weight: 600;
-  padding: 12px;
-}
-
-.modal-dialog-linked-button:hover {
-  background-color: #2e364c;
-}
-
-.modal-dialog-linked-button:default {
-  background-color: #6a8fd8;
-  color: #0e1119;
-}
-
-.modal-dialog-linked-button:default:hover {
-  background-color: #7fa3e6;
-}
-
-/* Anmeldung und Bildschirmsperre */
-.login-dialog,
-.unlock-dialog {
-  background-color: transparent;
-}
-
-.login-dialog-user-list-view,
-.login-dialog-banner-view {
-  border-radius: 18px;
-}
-
-.login-dialog-user-list:expanded .login-dialog-user-list-item:focus {
-  background-color: rgba(106, 143, 216, 0.30);
-  border-radius: 12px;
-}
-
-.login-dialog-prompt-entry,
-.unlock-dialog-prompt-entry {
-  background-color: rgba(37, 43, 61, 0.92);
-  border: 1px solid rgba(106, 143, 216, 0.24);
-  border-radius: 999px;
-  color: #e7eef9;
-  padding: 9px 16px;
-}
-
-.login-dialog-prompt-entry:focus,
-.unlock-dialog-prompt-entry:focus {
-  border-color: #6a8fd8;
-}
-
-.login-dialog-button,
-.unlock-dialog-button {
-  border-radius: 999px;
-}
-
-/* ---------- Bildschirmanzeigen (Lautstaerke, Helligkeit) ---------- */
-.osd-window {
-  background-color: rgba(27, 31, 46, 0.96);
-  border: 1px solid rgba(106, 143, 216, 0.22);
-  border-radius: 18px;
-  color: #e7eef9;
-}
-
-.osd-window .level-bar {
-  background-color: #6a8fd8;
-  border-radius: 999px;
-}
-
-/* ---------- Schalter und Regler ---------- */
-.toggle-switch {
-  color: #8ea3c0;
-}
-
-.slider {
-  color: #6a8fd8;
-  -barlevel-background-color: #252b3d;
-  -barlevel-active-background-color: #6a8fd8;
-  -slider-handle-radius: 9px;
-  -barlevel-height: 5px;
-  -barlevel-border-radius: 999px;
-}
-
-/* ---------- Hilfetexte ---------- */
-.dash-label,
-.tile-preview,
-#Tooltip {
-  background-color: rgba(27, 31, 46, 0.97);
-  border: 1px solid rgba(106, 143, 216, 0.22);
-  border-radius: 10px;
-  color: #e7eef9;
-  padding: 6px 12px;
-}
-
-.tile-preview {
-  background-color: rgba(106, 143, 216, 0.28);
-  border: 2px solid #6a8fd8;
-  border-radius: 12px;
-}
-
-/* ---------- Scrollbalken ---------- */
-StScrollBar StButton#vhandle,
-StScrollBar StButton#hhandle {
-  background-color: rgba(142, 163, 192, 0.35);
-  border-radius: 999px;
-}
-
-StScrollBar StButton#vhandle:hover,
-StScrollBar StButton#hhandle:hover {
-  background-color: rgba(142, 163, 192, 0.55);
-}
-CSSEOF
+echo "[ViperosOS] Setze GNOME-Shell-Theme zusammen..."
+
+THEME=/usr/share/themes/ViperOS/gnome-shell
+BASE="$THEME/gnome-shell-base.css"
+OVER="$THEME/viperos-overrides.css"
+OUT="$THEME/gnome-shell.css"
+
+if [ ! -f "$BASE" ]; then
+    # Rueckfall: Basis aus dem installierten gnome-shell-common ziehen.
+    echo "  gnome-shell-base.css fehlt - extrahiere aus gnome-shell-theme.gresource"
+    G=/usr/share/gnome-shell/gnome-shell-theme.gresource
+    if [ -f "$G" ] && command -v gresource >/dev/null 2>&1; then
+        mkdir -p "$THEME"
+        gresource extract "$G" /org/gnome/shell/theme/gnome-shell-dark.css > "$BASE"
+        for svg in calendar-today.svg calendar-today-light.svg \
+                   gnome-shell-start.svg workspace-placeholder.svg; do
+            gresource extract "$G" "/org/gnome/shell/theme/$svg" > "$THEME/$svg" 2>/dev/null || true
+        done
+    else
+        echo "  WARNUNG: weder Basis-CSS noch gresource verfuegbar"
+    fi
+fi
+
+if [ -f "$BASE" ] && [ -f "$OVER" ]; then
+    {
+        cat "$BASE"
+        printf '\n\n/* ==== ViperOS-Ueberschreibungen ab hier ==== */\n\n'
+        cat "$OVER"
+    } > "$OUT"
+    echo "  gnome-shell.css erzeugt: $(stat -c%s "$OUT") Bytes"
+    echo "    davon Basis:        $(stat -c%s "$BASE") Bytes"
+    echo "    davon ViperOS:      $(stat -c%s "$OVER") Bytes"
+else
+    echo "  WARNUNG: Theme konnte nicht zusammengesetzt werden"
+    [ -f "$BASE" ] || echo "    fehlt: $BASE"
+    [ -f "$OVER" ] || echo "    fehlt: $OVER"
+fi
 
 # index.theme kennzeichnet das Verzeichnis als Theme; ohne sie taucht
 # "ViperOS" in gnome-tweaks nicht in der Auswahl auf.
-cat > "$THEME/index.theme" << 'EOF'
+cat > /usr/share/themes/ViperOS/index.theme << 'EOF'
 [Desktop Entry]
 Type=X-GNOME-Metatheme
 Name=ViperOS
@@ -493,16 +71,19 @@ GtkTheme=Adwaita-dark
 MetacityTheme=Adwaita
 IconTheme=Papirus-Dark
 CursorTheme=Adwaita
-ButtonLayout=appmenu:minimize,maximize,close
+ButtonLayout=close,minimize,maximize:appmenu
 EOF
 
-# GTK4-Anwendungen (Nautilus, Einstellungen) nutzen libadwaita. Deren
-# Farben lassen sich nicht per Theme tauschen, aber ueber @define-color
-# in der Benutzer-CSS anpassen - hier systemweit als Vorgabe.
+# ----------------------------------------------------------------------
+# GTK4/libadwaita-Anwendungen (Nautilus, Einstellungen, Textfenster)
+# Deren Farben lassen sich nicht ueber ein Theme tauschen, wohl aber ueber
+# @define-color in der Benutzer-CSS.
+# ----------------------------------------------------------------------
 mkdir -p /etc/skel/.config/gtk-4.0 /etc/skel/.config/gtk-3.0
 cat > /etc/skel/.config/gtk-4.0/gtk.css << 'EOF'
 /* ViperOS: libadwaita-Farben an das Shell-Theme angleichen */
 @define-color accent_bg_color #6a8fd8;
+@define-color accent_fg_color #0e1119;
 @define-color accent_color #8fb0e8;
 @define-color window_bg_color #12151f;
 @define-color window_fg_color #e7eef9;
@@ -510,14 +91,20 @@ cat > /etc/skel/.config/gtk-4.0/gtk.css << 'EOF'
 @define-color view_fg_color #e7eef9;
 @define-color headerbar_bg_color #1b1f2e;
 @define-color headerbar_fg_color #e7eef9;
+@define-color headerbar_border_color #22344f;
 @define-color sidebar_bg_color #161a27;
 @define-color sidebar_fg_color #e7eef9;
+@define-color sidebar_border_color #22344f;
+@define-color secondary_sidebar_bg_color #12151f;
 @define-color card_bg_color #252b3d;
 @define-color card_fg_color #e7eef9;
-@define-color popover_bg_color #1f2433;
-@define-color popover_fg_color #e7eef9;
 @define-color dialog_bg_color #1b1f2e;
 @define-color dialog_fg_color #e7eef9;
+@define-color popover_bg_color #1f2433;
+@define-color popover_fg_color #e7eef9;
+@define-color thumbnail_bg_color #1b1f2e;
+@define-color shade_color rgba(0, 0, 0, 0.36);
+@define-color scrollbar_outline_color rgba(106, 143, 216, 0.22);
 EOF
 cp /etc/skel/.config/gtk-4.0/gtk.css /etc/skel/.config/gtk-3.0/gtk.css
 
@@ -529,4 +116,4 @@ if id viperos >/dev/null 2>&1; then
     chown -R viperos:viperos /home/viperos/.config 2>/dev/null || true
 fi
 
-echo "[ViperosOS] Shell-Theme unter $THEME erstellt."
+echo "[ViperosOS] Shell-Theme unter /usr/share/themes/ViperOS bereit."

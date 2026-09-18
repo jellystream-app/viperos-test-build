@@ -1,0 +1,421 @@
+/* ============================================================
+   ViperOS - Ueberschreibungen fuer GNOME Shell 48
+
+   Diese Datei wird an gnome-shell-base.css ANGEHAENGT (siehe Hook
+   0020-viperos-theming), nicht als Ersatz geladen.
+
+   Warum: Die user-theme-Extension ruft Main.setThemeStylesheet(pfad)
+   auf, und GNOME laedt sein eigenes Stylesheet NUR, wenn keines gesetzt
+   ist. Ein eigenstaendiges Theme ersetzt also die kompletten 174 KB
+   Standardregeln. Fehlen die, zeichnet die Shell mit St-Voreinstellungen -
+   die Topbar ist dann ein einfacher Balken ohne Rundungen, Menues und
+   Uebersicht verlieren ihr Aussehen. Genau das war der Fehler zuvor.
+
+   Farbwelt (aus den ViperOS-Hintergruenden abgeleitet):
+     #12151f  Grund
+     #1b1f2e  Flaechen (Panel, Dash, Popups)
+     #252b3d  erhoehte Flaechen
+     #6a8fd8  Akzent
+     #e7eef9  Text
+     #8ea3c0  Text gedaempft
+   ============================================================ */
+
+/* ---------- Schrift ---------- */
+stage {
+  font-family: Inter, "Noto Sans", sans-serif;
+  font-size: 11pt;
+  color: #e7eef9;
+}
+
+/* ---------- Obere Leiste: schwebend ----------
+   Der auffaelligste Unterschied zu Standard-GNOME, wo die Leiste
+   randlos und rechteckig ueber die volle Breite laeuft.            */
+#panel {
+  background-color: rgba(18, 21, 31, 0.88);
+  font-weight: 600;
+  height: 2.3em;
+  margin: 6px 8px 0 8px;
+  border-radius: 15px;
+  border: 1px solid rgba(106, 143, 216, 0.20);
+  transition-duration: 250ms;
+}
+
+#panel:overview {
+  background-color: rgba(18, 21, 31, 0.42);
+  border-color: rgba(106, 143, 216, 0.10);
+}
+
+/* Die Eckfuellungen, die GNOME unter die Leiste zeichnet, wuerden bei
+   einer schwebenden Leiste als graue Zipfel sichtbar bleiben. */
+#panel .panel-corner {
+  -panel-corner-radius: 0;
+  -panel-corner-background-color: transparent;
+  -panel-corner-border-color: transparent;
+  -panel-corner-border-width: 0;
+}
+
+#panel .panel-button {
+  border-radius: 10px;
+  border: 2px solid transparent;
+  color: #d4dff0;
+  -natural-hpadding: 11px;
+  -minimum-hpadding: 7px;
+}
+
+#panel .panel-button:hover {
+  background-color: rgba(106, 143, 216, 0.18);
+  color: #ffffff;
+}
+
+#panel .panel-button:active,
+#panel .panel-button:overview,
+#panel .panel-button:focus,
+#panel .panel-button:checked {
+  background-color: rgba(106, 143, 216, 0.30);
+  color: #ffffff;
+  box-shadow: none;
+}
+
+#panel .panel-button .system-status-icon,
+#panel .panel-status-indicators-box .system-status-icon {
+  icon-size: 16px;
+}
+
+#panelLeft, #panelCenter, #panelRight {
+  spacing: 2px;
+}
+
+/* ---------- Popups und Menues ---------- */
+.popup-menu-boxpointer,
+.candidate-popup-boxpointer {
+  -arrow-border-radius: 17px;
+  -arrow-background-color: rgba(27, 31, 46, 0.97);
+  -arrow-border-color: rgba(106, 143, 216, 0.22);
+  -arrow-border-width: 1px;
+  -arrow-base: 0;
+  -arrow-rise: 0;
+  -boxpointer-gap: 7px;
+}
+
+.popup-menu .popup-menu-content,
+.quick-settings {
+  padding: 9px;
+  border-radius: 17px;
+  background-color: transparent;
+}
+
+.popup-menu-item {
+  border-radius: 11px;
+  spacing: 10px;
+}
+
+.popup-menu-item:hover,
+.popup-menu-item:focus,
+.popup-menu-item.selected {
+  background-color: rgba(106, 143, 216, 0.22);
+  color: #ffffff;
+}
+
+.popup-menu-item:active {
+  background-color: #6a8fd8;
+  color: #0e1119;
+}
+
+.popup-separator-menu-item .popup-separator-menu-item-separator,
+.popup-separator-menu-item .popup-sub-menu .popup-separator-menu-item-separator {
+  background-color: rgba(142, 163, 192, 0.20);
+}
+
+/* ---------- Schnelleinstellungen ---------- */
+.quick-toggle,
+.quick-menu-toggle,
+.quick-slider {
+  border-radius: 14px;
+  background-color: #252b3d;
+  color: #e7eef9;
+}
+
+.quick-toggle:hover,
+.quick-menu-toggle:hover {
+  background-color: #2e364c;
+}
+
+.quick-toggle:checked,
+.quick-menu-toggle:checked,
+.quick-toggle:checked:hover {
+  background-color: #6a8fd8;
+  color: #0e1119;
+}
+
+.quick-settings-system-item .icon-button,
+.quick-settings .icon-button {
+  border-radius: 999px;
+  background-color: #252b3d;
+  color: #e7eef9;
+}
+
+.quick-settings .icon-button:hover {
+  background-color: rgba(106, 143, 216, 0.28);
+}
+
+.slider {
+  color: #6a8fd8;
+  -barlevel-background-color: #252b3d;
+  -barlevel-active-background-color: #6a8fd8;
+  -barlevel-border-color: transparent;
+  -barlevel-active-border-color: transparent;
+  -barlevel-height: 5px;
+}
+
+/* ---------- Kalender und Benachrichtigungen ---------- */
+#calendarArea {
+  padding: 6px;
+}
+
+.datemenu-today-button,
+.datemenu-displays-box,
+.message-list-section-list,
+.world-clocks-button,
+.weather-button,
+.events-button {
+  border-radius: 14px;
+}
+
+.calendar {
+  border-radius: 14px;
+  padding: 8px;
+}
+
+.calendar-day-base {
+  border-radius: 999px;
+}
+
+.calendar-day-base:hover {
+  background-color: rgba(106, 143, 216, 0.22);
+}
+
+.calendar-day-base:selected {
+  background-color: rgba(106, 143, 216, 0.42);
+  color: #ffffff;
+}
+
+.calendar-today,
+.calendar-day-base.calendar-today {
+  background-color: #6a8fd8;
+  color: #0e1119;
+  font-weight: 800;
+  border-color: transparent;
+}
+
+.message {
+  border-radius: 14px;
+  background-color: rgba(37, 43, 61, 0.95);
+  color: #e7eef9;
+}
+
+.message:hover {
+  background-color: rgba(46, 54, 76, 0.97);
+}
+
+.message-title {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.message-content {
+  color: #a9b8ce;
+}
+
+/* ---------- Uebersicht ---------- */
+#overview {
+  spacing: 18px;
+}
+
+.window-clone-border {
+  border: 2px solid rgba(106, 143, 216, 0.85);
+  border-radius: 12px;
+}
+
+.window-caption {
+  background-color: rgba(27, 31, 46, 0.92);
+  border-radius: 999px;
+  color: #e7eef9;
+  font-weight: 600;
+  padding: 5px 14px;
+}
+
+.workspace-thumbnail-indicator {
+  border: 2px solid #6a8fd8;
+  border-radius: 10px;
+}
+
+/* Suchfeld */
+#searchEntry {
+  border-radius: 999px;
+  background-color: rgba(37, 43, 61, 0.92);
+  border: 1px solid rgba(106, 143, 216, 0.22);
+  color: #e7eef9;
+  width: 340px;
+  padding: 9px 18px;
+}
+
+#searchEntry:focus {
+  border-color: #6a8fd8;
+  box-shadow: inset 0 0 0 1px rgba(106, 143, 216, 0.5);
+}
+
+.search-section-content {
+  background-color: rgba(27, 31, 46, 0.86);
+  border-radius: 17px;
+}
+
+.list-search-result:hover,
+.list-search-result:focus,
+.grid-search-result:hover,
+.grid-search-result:focus {
+  background-color: rgba(106, 143, 216, 0.20);
+  border-radius: 12px;
+}
+
+/* ---------- Dash / Dock ---------- */
+#dash {
+  background-color: rgba(18, 21, 31, 0.62);
+  border: 1px solid rgba(106, 143, 216, 0.18);
+  border-radius: 22px;
+  padding: 7px;
+}
+
+#dashtodockContainer .dash-background {
+  background-color: rgba(18, 21, 31, 0.62);
+  border: 1px solid rgba(106, 143, 216, 0.18);
+  border-radius: 22px;
+}
+
+.dash-item-container .app-well-app .overview-icon,
+.dash-item-container .show-apps .overview-icon {
+  border-radius: 13px;
+}
+
+.dash-label {
+  background-color: rgba(27, 31, 46, 0.97);
+  border: 1px solid rgba(106, 143, 216, 0.22);
+  border-radius: 10px;
+  color: #e7eef9;
+}
+
+/* ---------- Anwendungsraster ---------- */
+.app-well-app .overview-icon,
+.grid-search-result .overview-icon,
+.app-folder .overview-icon {
+  border-radius: 14px;
+  color: #e7eef9;
+}
+
+.app-well-app:hover .overview-icon,
+.app-well-app:focus .overview-icon,
+.grid-search-result:hover .overview-icon {
+  background-color: rgba(106, 143, 216, 0.20);
+}
+
+.app-well-app:active .overview-icon,
+.app-well-app:checked .overview-icon {
+  background-color: rgba(106, 143, 216, 0.34);
+}
+
+.app-folder-dialog {
+  border-radius: 21px;
+  background-color: rgba(27, 31, 46, 0.97);
+  border: 1px solid rgba(106, 143, 216, 0.22);
+}
+
+.page-indicator:checked .page-indicator-icon {
+  background-color: #6a8fd8;
+}
+
+/* ---------- Dialoge ---------- */
+.modal-dialog {
+  border-radius: 19px;
+  background-color: rgba(27, 31, 46, 0.98);
+  border: 1px solid rgba(106, 143, 216, 0.22);
+  color: #e7eef9;
+}
+
+.modal-dialog .modal-dialog-linked-button {
+  background-color: #252b3d;
+  color: #e7eef9;
+  font-weight: 600;
+  border: none;
+}
+
+.modal-dialog .modal-dialog-linked-button:hover {
+  background-color: #2e364c;
+}
+
+.modal-dialog .modal-dialog-linked-button:default {
+  background-color: #6a8fd8;
+  color: #0e1119;
+}
+
+.modal-dialog .modal-dialog-linked-button:default:hover {
+  background-color: #7fa3e6;
+}
+
+/* ---------- Anmeldung und Sperrbildschirm ---------- */
+.login-dialog {
+  background-color: transparent;
+}
+
+.login-dialog-prompt-entry,
+.unlock-dialog-prompt-entry {
+  border-radius: 999px;
+  background-color: rgba(37, 43, 61, 0.92);
+  border: 1px solid rgba(106, 143, 216, 0.24);
+  color: #e7eef9;
+}
+
+.login-dialog-prompt-entry:focus,
+.unlock-dialog-prompt-entry:focus {
+  border-color: #6a8fd8;
+}
+
+.login-dialog-user-list:expanded .login-dialog-user-list-item:focus,
+.login-dialog-user-list:expanded .login-dialog-user-list-item:selected {
+  background-color: rgba(106, 143, 216, 0.30);
+  border-radius: 12px;
+}
+
+.login-dialog-button,
+.unlock-dialog-button {
+  border-radius: 999px;
+}
+
+/* ---------- Bildschirmanzeigen ---------- */
+.osd-window {
+  border-radius: 19px;
+  background-color: rgba(27, 31, 46, 0.96);
+  border: 1px solid rgba(106, 143, 216, 0.22);
+  color: #e7eef9;
+}
+
+.osd-window .level-bar {
+  background-color: #6a8fd8;
+}
+
+/* ---------- Kachelvorschau beim Fensterziehen ---------- */
+.tile-preview {
+  background-color: rgba(106, 143, 216, 0.28);
+  border: 2px solid #6a8fd8;
+  border-radius: 12px;
+}
+
+/* ---------- Scrollbalken ---------- */
+StScrollBar StButton#vhandle,
+StScrollBar StButton#hhandle {
+  background-color: rgba(142, 163, 192, 0.35);
+  border-radius: 999px;
+}
+
+StScrollBar StButton#vhandle:hover,
+StScrollBar StButton#hhandle:hover {
+  background-color: rgba(142, 163, 192, 0.55);
+}
