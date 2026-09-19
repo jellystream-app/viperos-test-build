@@ -31,13 +31,30 @@ packages/out/
 # Der private Signierschluessel des APT-Repos liegt als GitHub-Secret
 # (APT_SIGNING_KEY). Landet er hier, kann jeder Pakete unter ViperOS-Namen
 # signieren und sie wuerden auf allen installierten Systemen als
-# vertrauenswuerdig gelten.
+# vertrauenswuerdig gelten - also Codeausfuehrung als root auf jedem Geraet.
 *.asc
 *.gpg
 *.key
 *.sec
+*.pem
+*.p12
 secring.*
 !packages/viperos-settings/usr/share/keyrings/viperos-archive-keyring.gpg
+
+# Notizen mit Zugangsdaten. Diese Muster fehlten: ".md" war von den Regeln
+# oben nicht erfasst, eine hier abgelegte secrets.md waere von "git add -A"
+# aufgesammelt und in ein OEFFENTLICHES Repository gepusht worden. Einmal
+# gepusht bleibt ein Schluessel in der Historie, auch nach dem Loeschen.
+#
+# Die Einrichtungsanleitung liegt deshalb ausserhalb des Repositories unter
+# C:\Users\Jason\viperos-secrets.md
+secrets.md
+secrets.txt
+SECRETS.md
+*-secrets.md
+*.token
+.env
+.env.*
 
 # OS-Kram
 Thumbs.db

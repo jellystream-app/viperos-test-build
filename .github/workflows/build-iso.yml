@@ -235,6 +235,47 @@ jobs:
             fi
           done
 
+          # Zugangsdaten im gesamten Repository, nicht nur in den Paketen.
+          # Die Pruefung oben sieht nur usr/share/keyrings/; ein privater
+          # Schluessel oder eine Notizdatei im Wurzelverzeichnis waere ihr
+          # entgangen. .gitignore fasst beides ab, aber eine Datei, die schon
+          # getrackt IST, ignoriert git nicht mehr - dann faellt es nur hier
+          # auf, und zwar bevor jemand das Repository liest.
+          # Gesucht wird die vollstaendige ARMOR-Zeile eines Schluesselblocks,
+          # nicht die Wortfolge "PRIVATE KEY BLOCK". Der erste Versuch tat
+          # letzteres und schlug sofort auf die Pruefungen selbst an, die diese
+          # Woerter als Suchmuster enthalten - ein Check, der bei korrektem
+          # Code Alarm gibt, wird ignoriert und ist damit wertlos.
+          leak=0
+          while IFS= read -r f; do
+            case "$f" in
+              # Der oeffentliche Keyring gehoert ins Paket.
+              packages/viperos-settings/usr/share/keyrings/viperos-archive-keyring.gpg) continue ;;
+              # Die Workflows und Hooks pruefen selbst auf Schluesselmaterial
+              # und nennen die Marker deshalb im Klartext.
+              .github/workflows/*|build/lb-config/hooks/live/*) continue ;;
+            esac
+            if git show ":$f" 2>/dev/null \
+               | grep -qa -- '-----BEGIN .*PRIVATE KEY BLOCK-----'; then
+              echo "::error::$f enthaelt privates Schluesselmaterial"
+              leak=1
+            fi
+          done < <(git ls-files)
+
+          # Dateinamen, die typischerweise Zugangsdaten tragen.
+          while IFS= read -r f; do
+            echo "::error::$f ist eingecheckt - Zugangsdaten gehoeren nicht ins Repository"
+            leak=1
+          done < <(git ls-files | grep -iE '(^|/)(secrets?\.(md|txt|ya?ml)|\.env|.*\.token|.*-secrets\.md)$' || true)
+
+          if [ "$leak" -ne 0 ]; then
+            echo ""
+            echo "Ein gepushter Schluessel bleibt in der Git-Historie, auch nach"
+            echo "dem Loeschen. Er muss als kompromittiert gelten und ersetzt"
+            echo "werden - siehe die Hinweise in der Einrichtungsanleitung."
+            bad=1
+          fi
+
           # /usr/local ist laut Debian Policy dem lokalen Administrator
           # vorbehalten; Paketdateien dort sind ein Policy-Verstoss.
           #
