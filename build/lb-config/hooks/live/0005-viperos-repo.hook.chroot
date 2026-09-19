@@ -84,13 +84,27 @@ apt-get update
 # faellt ein Signaturfehler erst auf, wenn apt-get install das Paket nicht
 # findet - mit einer Meldung, die auf die Paketliste zeigt statt auf die
 # Quelle.
-if apt-cache policy viperos-desktop 2>/dev/null | grep -q 'ViperOS'; then
-    echo "  Quelle aktiv - viperos-desktop ist sichtbar:"
-    apt-cache policy viperos-desktop | sed -n '1,4p;/ViperOS/p' | sed 's/^/    /'
+#
+# Geprueft wird der KANDIDAT, nicht ein Wort in der Ausgabe. Zuvor stand hier
+# grep 'ViperOS' - das konnte nie zutreffen: apt-cache policy nennt die
+# Quell-URL, und die ist kleingeschrieben (viperos-apt). Der Hook brach
+# deshalb unter "set -e" ab und liess den ganzen ISO-Bau scheitern, obwohl
+# das Paket direkt darunter mit "Candidate: 2.0.0" aufgelistet war.
+CANDIDATE=$(apt-cache policy viperos-desktop 2>/dev/null \
+            | awk '/Candidate:/ {print $2; exit}')
+
+if [ -n "$CANDIDATE" ] && [ "$CANDIDATE" != "(none)" ]; then
+    echo "  Quelle aktiv - viperos-desktop $CANDIDATE gefunden."
+    # Herkunft ausgeben: sie muss unsere Quelle sein, nicht Debian.
+    apt-cache policy viperos-desktop 2>/dev/null \
+      | grep -F "$REPO_URL" | sed 's/^ */    /' \
+      || echo "    WARNUNG: Kandidat stammt nicht aus $REPO_URL"
 else
-    echo "  FEHLER: viperos-desktop ist nicht sichtbar."
-    echo "  Entweder ist das Repository leer, oder die Signatur passt nicht"
-    echo "  zum ausgelieferten Schluessel."
+    echo "  FEHLER: viperos-desktop ist nicht installierbar."
+    echo "  Moegliche Ursachen:"
+    echo "    - das Repository ist leer (packages.yml noch nicht gelaufen)"
+    echo "    - die Signatur passt nicht zum ausgelieferten Schluessel"
+    echo "    - apt hat die Quelle wegen eines Formatfehlers verworfen"
     apt-cache policy viperos-desktop 2>&1 | sed 's/^/    /'
     exit 1
 fi

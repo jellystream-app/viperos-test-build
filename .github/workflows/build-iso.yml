@@ -656,27 +656,34 @@ jobs:
               lb clean || true
               bash auto/config
 
-              # Exit-Status von lb build erhalten - "| tee" wuerde ihn
-              # verschlucken und einen Fehlschlag als Erfolg tarnen.
+              # Direkt nach /output schreiben, nicht nach /build. Vorher lag das
+              # Log in /build und wurde erst NACH dem Erfolgspfad kopiert - bei
+              # einem Fehlschlag beendete "exit $rc" den Container vorher, das
+              # Log war weg, und "if-no-files-found: warn" verschwieg das.
+              # Genau im Fehlerfall fehlte also die Datei, die man braucht.
               set +e
-              lb build 2>&1 | tee /build/build.log
+              lb build 2>&1 | tee /output/build.log
               rc=${PIPESTATUS[0]}
               set -e
               if [ "$rc" -ne 0 ]; then
                 echo "::error::lb build fehlgeschlagen (rc=$rc)"
-                echo "--- letzte 60 Logzeilen ---"
-                tail -60 /build/build.log
+                echo "--- letzte 120 Logzeilen ---"
+                tail -120 /output/build.log
+                echo "--- Zeilen, die nach der Ursache aussehen ---"
+                # Chroot-Fehler und apt-Meldungen stehen oft weit oben im Log,
+                # nicht am Ende - das Ende zeigt nur, wo live-build aufgab.
+                grep -nE '^E:|^Err:|error:|FEHLER|Unable to locate|No such file|Permission denied|Hook.*failed|dpkg: error' \
+                  /output/build.log | tail -40 || echo "(keine passende Zeile gefunden)"
                 exit "$rc"
               fi
 
               iso=$(find /build -maxdepth 1 -name "*.iso" -print -quit)
               if [ -z "$iso" ]; then
                 echo "::error::lb build meldete Erfolg, erzeugte aber keine ISO"
-                tail -60 /build/build.log
+                tail -120 /output/build.log
                 exit 1
               fi
               cp "$iso" /output/viperos-2.0-amd64.iso
-              cp /build/build.log /output/build.log
               cd /output
               sha256sum viperos-2.0-amd64.iso > viperos-2.0-amd64.iso.sha256
               echo "ISO fertig: $(du -h viperos-2.0-amd64.iso | cut -f1)"
