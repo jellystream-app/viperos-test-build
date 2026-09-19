@@ -32,3 +32,6 @@ desktop.ini
 # Quellordner fuer Wallpaper-Uploads; die Bilder liegen bereits unter
 # build/lb-config/includes.chroot/usr/share/backgrounds/viperos/
 wallpaper-upload/
+
+# Dateien zum Live-Testen in der VM (nicht Teil des Images)
+live-test/
