@@ -243,10 +243,101 @@ jobs:
           # Werkzeuge.
           export GNUPGHOME=$(mktemp -d)
           chmod 700 "$GNUPGHOME"
-          printf '%s' "$SIGNING_KEY" | gpg --batch --quiet --import
+
+          # Den Schluessel ueber eine Datei importieren, nicht ueber eine Pipe,
+          # damit die Form vorher geprueft werden kann. Beim Kopieren aus einer
+          # Textanzeige gehen leicht Details verloren, und "gpg --import" sagt
+          # dann nur "no valid OpenPGP data found" - eine Meldung, die nicht
+          # verraet, WAS fehlt. Getestet wurde, was der Import ueberlebt:
+          #   CRLF-Zeilenenden      -> unkritisch
+          #   fehlende CRC-Zeile    -> unkritisch
+          #   fehlende END-Zeile    -> unkritisch
+          #   fehlende Leerzeile nach BEGIN -> Abbruch ("invalid armor header")
+          #   fehlende BEGIN-Zeile          -> Abbruch
+          #   eingerueckte Zeilen           -> Abbruch
+          #   Zeilenumbrueche verloren      -> Abbruch
+          #   oeffentlicher statt privater Schluessel -> Abbruch
+          printf '%s\n' "$SIGNING_KEY" > "$GNUPGHOME/key.asc"
+
+          if ! grep -q 'BEGIN PGP PRIVATE KEY BLOCK' "$GNUPGHOME/key.asc"; then
+            echo "::error::APT_SIGNING_KEY enthaelt keinen privaten Schluessel."
+            lines=$(wc -l < "$GNUPGHOME/key.asc")
+
+            # Auf einen oeffentlichen Schluessel pruefen. Der armored Fall ist
+            # einfach; der BINAERE Keyring dagegen laesst sich hier grundsaetzlich
+            # nicht mehr als Schluessel erkennen: ein GitHub-Secret ist eine
+            # Umgebungsvariable, und die kann keine Nullbytes enthalten. Wer
+            # viperos-archive-keyring.gpg als Secret einsetzt, liefert damit
+            # zwangslaeufig ein beschaedigtes Binaerformat ab, das gpg nicht
+            # mehr liest. Erkennbar bleibt es an der Form: Binaerdaten haben
+            # kaum Zeilenumbrueche und enthalten Steuerzeichen.
+            if grep -q 'BEGIN PGP PUBLIC KEY BLOCK' "$GNUPGHOME/key.asc"; then
+              echo "  Es ist der OEFFENTLICHE Schluessel - der gehoert ins"
+              echo "  Paket, nicht in dieses Secret. Gebraucht wird der"
+              echo "  private Teil: die Datei private-key.asc, nicht"
+              echo "  viperos-archive-keyring.gpg."
+            elif LC_ALL=C grep -qP '[\x00-\x08\x0e-\x1f]' "$GNUPGHOME/key.asc" 2>/dev/null; then
+              echo "  Der Wert enthaelt Binaerdaten. Wahrscheinlich wurde"
+              echo "  viperos-archive-keyring.gpg eingesetzt - das ist der"
+              echo "  oeffentliche Schluessel im Binaerformat und taugt hier"
+              echo "  doppelt nicht: gebraucht wird der private Teil, und ein"
+              echo "  Secret kann keine Binaerdaten unbeschadet tragen."
+              echo "  Richtig ist die Textdatei private-key.asc."
+            elif [ "$lines" -le 2 ]; then
+              echo "  Der Wert hat nur $lines Zeile(n). Beim Einfuegen sind die"
+              echo "  Zeilenumbrueche verloren gegangen - der Block braucht sie."
+            else
+              echo "  Die Zeile '-----BEGIN PGP PRIVATE KEY BLOCK-----' fehlt."
+              echo "  Beim Kopieren muss sie mit, ebenso die END-Zeile."
+            fi
+            echo "  Zeilen im Secret: $lines (erwartet: rund 56)"
+            exit 1
+          fi
+
+          # Zeile 2 muss leer sein: bei OpenPGP trennt sie den Armor-Header vom
+          # Datenblock. Fehlt sie, liest gpg die erste Datenzeile als Header und
+          # bricht mit "invalid armor header" ab. Textanzeigen verschlucken
+          # diese Leerzeile besonders leicht.
+          if [ -n "$(sed -n '2p' "$GNUPGHOME/key.asc" | tr -d '[:space:]')" ]; then
+            echo "::warning::Nach der BEGIN-Zeile fehlt die Leerzeile - wird ergaenzt."
+            sed -i '1a\\' "$GNUPGHOME/key.asc"
+          fi
+
+          # Fuehrende Leerzeichen entfernen (Einrueckung beim Einfuegen) und CR
+          # tilgen - beides macht den Block sonst unlesbar bzw. unnoetig fragil.
+          sed -i 's/\r$//; s/^[[:blank:]]\+//' "$GNUPGHOME/key.asc"
+
+          if ! gpg --batch --quiet --import "$GNUPGHOME/key.asc" 2>"$GNUPGHOME/err"; then
+            echo "::error::Import von APT_SIGNING_KEY fehlgeschlagen:"
+            sed 's/^/    /' "$GNUPGHOME/err"
+            echo "  Der Block muss unveraendert eingefuegt werden: BEGIN-Zeile,"
+            echo "  Leerzeile, Datenzeilen, CRC-Zeile, END-Zeile."
+            exit 1
+          fi
+
           KEYID=$(gpg --batch --with-colons --list-secret-keys \
                     | awk -F: '/^fpr:/ {print $10; exit}')
+          if [ -z "$KEYID" ]; then
+            echo "::error::Kein geheimer Schluessel nach dem Import vorhanden."
+            echo "  Der Block wurde gelesen, enthielt aber keinen privaten Teil."
+            exit 1
+          fi
           echo "Signiere mit $KEYID"
+
+          # Der Schluessel muss zu dem passen, den die Pakete ausliefern - sonst
+          # lehnt jedes installierte System das Repository ab, obwohl hier alles
+          # gelingt. Das ist der eine Fehler, der erst beim Nutzer auffaellt.
+          PUBFPR=$(gpg --batch --with-colons --show-keys \
+                     "$GITHUB_WORKSPACE/packages/viperos-settings/usr/share/keyrings/viperos-archive-keyring.gpg" \
+                   | awk -F: '/^fpr:/ {print $10; exit}')
+          if [ "$KEYID" != "$PUBFPR" ]; then
+            echo "::error::APT_SIGNING_KEY passt nicht zum ausgelieferten Keyring."
+            echo "  Signierschluessel:      $KEYID"
+            echo "  Im Paket ausgeliefert:  $PUBFPR"
+            echo "  Installierte Systeme wuerden dieses Repository ablehnen."
+            exit 1
+          fi
+          echo "Passt zum ausgelieferten Keyring ($PUBFPR)."
 
           gpg --batch --yes --default-key "$KEYID" \
               --clearsign -o dists/trixie/InRelease dists/trixie/Release
