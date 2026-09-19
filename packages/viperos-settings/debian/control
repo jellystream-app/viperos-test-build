@@ -12,7 +12,8 @@ Architecture: all
 Depends: ${misc:Depends},
          dconf-cli,
          dconf-gsettings-backend
-Recommends: viperos-desktop-theme
+Recommends: viperos-desktop-theme,
+            python3-pil
 Description: Systemweite Vorgaben und Paketquelle von ViperOS
  Legt fest, wie ViperOS beim ersten Start aussieht und verhaelt: dunkles
  Erscheinungsbild, Fensterknoepfe links, aktive Erweiterungen, Tastenkuerzel,

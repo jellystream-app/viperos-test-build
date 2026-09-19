@@ -1,0 +1,11 @@
+/* ViperOS: Hintergrund des Anmeldebildschirms
+ *
+ * GDM laedt sein Stylesheet aus der gresource der Shell, nicht aus
+ * /usr/share/themes - das ViperOS-Theme greift dort also nicht. Ueber diese
+ * Datei laesst sich der Hintergrund des Anmeldedialogs trotzdem setzen.
+ */
+#lockDialogGroup {
+  background: #12151f url(file:///usr/share/backgrounds/viperos/viperos-slate.jpg);
+  background-size: cover;
+  background-position: center;
+}

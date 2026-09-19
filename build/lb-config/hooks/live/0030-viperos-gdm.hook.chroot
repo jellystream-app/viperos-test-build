@@ -1,123 +1,42 @@
 #!/bin/bash
-# ViperosOS - GDM-Anmeldebildschirm
+# ViperosOS - GDM als Anmeldemanager einrichten
 #
-# WICHTIG - das war zuvor falsch:
-# Der Hook schrieb nach /etc/dconf/db/gdm.d/ und legte ein eigenes
-# /etc/dconf/profile/gdm an. GDM benutzt aber eine DATEI-Datenbank:
+# Das AUSSEHEN des Anmeldebildschirms liegt seit V2 im Paket
+# viperos-settings (/etc/gdm3/greeter.dconf-defaults) und der Hintergrund im
+# Paket viperos-desktop-theme (viperos-gdm.css). Hier bleibt nur, was das
+# Live-Medium betrifft und nicht in ein Paket gehoert: welcher Dienst die
+# grafische Anmeldung uebernimmt.
 #
-#   /usr/share/dconf/profile/gdm:
-#       user-db:user
-#       file-db:/var/lib/gdm3/greeter-dconf-defaults
+# Zur Greeter-Datenbank, damit das Wissen nicht verloren geht:
 #
-# und /usr/share/gdm/generate-config (laeuft als ExecStartPre der
-# gdm.service) baut diese Datei bei JEDEM Start neu aus
-# /usr/share/gdm/dconf/. Einstellungen in /etc/dconf/db/gdm.d/ landen
-# dort nie - der Anmeldebildschirm blieb deshalb unveraendert.
+#   GDM benutzt eine DATEI-Datenbank, nicht /etc/dconf/db/gdm.d/:
+#       /usr/share/dconf/profile/gdm:
+#           user-db:user
+#           file-db:/var/lib/gdm3/greeter-dconf-defaults
 #
-# Richtig ist /etc/gdm3/greeter.dconf-defaults: Debian verlinkt diese
-# Datei bereits als /usr/share/gdm/dconf/90-debian-settings, sie wird
-# also automatisch mitkompiliert.
+#   /usr/share/gdm/generate-config laeuft als ExecStartPre von gdm.service
+#   und baut diese Datei bei JEDEM Start neu aus /usr/share/gdm/dconf/.
+#   Einstellungen in /etc/dconf/db/gdm.d/ landen dort nie - der
+#   Anmeldebildschirm blieb deshalb unveraendert. Richtig ist
+#   /etc/gdm3/greeter.dconf-defaults: Debian verlinkt diese Datei als
+#   /usr/share/gdm/dconf/90-debian-settings, sie wird also mitkompiliert.
 #
 # Autologin fuer die Live-Sitzung uebernimmt live-config (0080-gdm3).
 
 set -e
 
-echo "[ViperosOS] Konfiguriere GDM..."
-
-mkdir -p /etc/gdm3
+echo "[ViperosOS] Richte GDM ein..."
 
 # ----------------------------------------------------------------------
-# Aussehen des Anmeldebildschirms
-# ----------------------------------------------------------------------
-cat > /etc/gdm3/greeter.dconf-defaults << 'EOF'
-# ViperOS - Vorgaben fuer den Anmeldebildschirm
+# Ein Ueberbleibsel aus aelteren Images entfernen.
 #
-# Diese Datei ist via /usr/share/gdm/dconf/90-debian-settings verlinkt und
-# wird von generate-config in /var/lib/gdm3/greeter-dconf-defaults
-# kompiliert - der Datenbank, die GDMs dconf-Profil liest.
-
-[org/gnome/desktop/interface]
-color-scheme='prefer-dark'
-gtk-theme='Adwaita-dark'
-icon-theme='Papirus-Dark'
-cursor-theme='Adwaita'
-font-name='Inter 11'
-clock-show-weekday=true
-clock-show-date=true
-show-battery-percentage=true
-
-[org/gnome/login-screen]
-# Kein Debian-Logo: der Schluessel bleibt leer, damit gar keines erscheint.
-# (Ein eigenes Logo waere moeglich, wirkt auf dem Anmeldebildschirm neben
-#  dem Benutzerbild aber gedraengt.)
-logo=''
-banner-message-enable=false
-disable-user-list=false
-disable-restart-buttons=false
-enable-fingerprint-authentication=false
-enable-smartcard-authentication=false
-
-[org/gnome/desktop/background]
-picture-uri='file:///usr/share/backgrounds/viperos/viperos-slate.jpg'
-picture-uri-dark='file:///usr/share/backgrounds/viperos/viperos-slate.jpg'
-picture-options='zoom'
-primary-color='#20232c'
-secondary-color='#4a5769'
-
-[org/gnome/settings-daemon/plugins/power]
-sleep-inactive-ac-type='nothing'
-
-# Hinweis: Hier stand "enabled-extensions=[]". Eine leere Liste ohne
-# Typangabe kann dconf nicht zuordnen:
-#   error: enabled-extensions: invalid value: []: unable to infer type
-# dconf compile bricht dann ab -> generate-config scheitert als
-# ExecStartPre -> "Failed to start gdm.service". Die richtige Schreibweise
-# waere @as [] - der Eintrag ist aber ohnehin unnoetig, weil der
-# Anmeldebildschirm die Erweiterungen des Benutzers gar nicht laedt.
-EOF
-
-# ----------------------------------------------------------------------
-# NICHT vorkompilieren!
-#
-# Frueher stand hier ein "dconf compile /var/lib/gdm3/greeter-dconf-defaults".
-# Das hat GDM am Start gehindert - "Failed to start gdm.service":
-#
-#   1. Der Hook legte die Datei als root:root an.
-#   2. generate-config laeuft als ExecStartPre der gdm.service und ruft
-#      "as_gdm dconf compile ..." auf - also ALS BENUTZER Debian-gdm
-#      (setpriv --reuid Debian-gdm).
-#   3. Debian-gdm darf eine root-Datei nicht ersetzen: dconf schreibt
-#      zuerst eine temporaere Datei und benennt sie um - das scheitert mit
-#      "Permission denied".
-#   4. Faellt ExecStartPre durch, startet der Dienst nicht.
-#
-# generate-config baut die Datenbank ohnehin bei jedem Start neu und legt
-# das Verzeichnis dabei selbst korrekt an:
+# Lag /var/lib/gdm3/greeter-dconf-defaults als Datei mit falschen Rechten
+# vor, scheiterte generate-config beim Umbenennen seiner temporaeren Datei
+# ("Permission denied") - und mit dem ExecStartPre startete gdm.service
+# nicht. generate-config legt das Verzeichnis selbst korrekt an:
 #   install -m711 -oDebian-gdm -gDebian-gdm -d /var/lib/gdm3
-# Es genuegt also, /etc/gdm3/greeter.dconf-defaults zu schreiben - das ist
-# als /usr/share/gdm/dconf/90-debian-settings verlinkt und wird
-# automatisch mitkompiliert.
-#
-# Sicherheitshalber ein eventuell vorhandenes Ueberbleibsel entfernen,
-# damit ein aelteres Image nicht denselben Fehler behaelt.
+# ----------------------------------------------------------------------
 rm -f /var/lib/gdm3/greeter-dconf-defaults 2>/dev/null || true
-
-# ----------------------------------------------------------------------
-# Das ViperOS-Shell-Theme auch auf dem Anmeldebildschirm verwenden.
-#
-# GDM laedt sein Stylesheet aus der gresource der Shell, nicht aus
-# /usr/share/themes. Ueber die Datei unten laesst sich der Hintergrund
-# des Anmeldedialogs aber ergaenzen.
-# ----------------------------------------------------------------------
-mkdir -p /usr/share/gnome-shell/theme
-cat > /usr/share/gnome-shell/theme/viperos-gdm.css << 'EOF'
-/* ViperOS: Hintergrund des Anmeldebildschirms */
-#lockDialogGroup {
-  background: #12151f url(file:///usr/share/backgrounds/viperos/viperos-slate.jpg);
-  background-size: cover;
-  background-position: center;
-}
-EOF
 
 # ----------------------------------------------------------------------
 # GDM als Anmeldemanager eintragen. systemctl scheitert im Chroot ohne
@@ -133,4 +52,12 @@ for base in /lib/systemd/system /usr/lib/systemd/system; do
     fi
 done
 
-echo "[ViperosOS] GDM konfiguriert."
+# Gegenpruefen, dass das Paket seine Greeter-Vorgaben mitgebracht hat.
+if [ -f /etc/gdm3/greeter.dconf-defaults ]; then
+    echo "  Greeter-Vorgaben vorhanden (aus viperos-settings)"
+else
+    echo "  WARNUNG: /etc/gdm3/greeter.dconf-defaults fehlt -"
+    echo "  der Anmeldebildschirm erscheint in GNOMEs Standardoptik."
+fi
+
+echo "[ViperosOS] GDM eingerichtet."

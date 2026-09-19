@@ -28,10 +28,10 @@ lb config noauto \
     --uefi-secure-boot enable \
     --debian-installer live \
     --debian-installer-gui false \
-    --image-name    "viperos-1.0" \
-    --iso-application "ViperosOS 1.0" \
+    --image-name    "viperos-2.0" \
+    --iso-application "ViperOS 2.0" \
     --iso-publisher "ViperosOS Project" \
-    --iso-volume    "VIPEROS_1_0" \
+    --iso-volume    "VIPEROS_2_0" \
     --memtest       none \
     --firmware-binary    true \
     --firmware-chroot    true \

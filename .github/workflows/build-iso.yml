@@ -25,7 +25,7 @@ on:
         type: boolean
         default: false
       version:
-        description: 'Versions-Tag (z. B. 1.0). Leer = Lauf-Nummer'
+        description: 'Versions-Tag (z. B. 2.0). Leer = Lauf-Nummer'
         type: string
         default: ''
 
@@ -281,10 +281,28 @@ jobs:
             echo "::error::Trixie-Index leer, Pruefung nicht aussagekraeftig"; exit 1; }
 
           LIST=build/lb-config/package-lists/viperos-desktop.list.chroot
+
+          # Die eigenen Pakete stehen NICHT in Debian - sie kommen aus dem
+          # ViperOS-Repo, das Hook 0005 waehrend des Builds eintraegt. Sie
+          # hier mitzupruefen wuerde den Preflight scheitern lassen, obwohl
+          # der Build in Ordnung ist. Dass sie gebaut werden koennen, prueft
+          # der Workflow packages.yml; dass sie im Repo liegen, prueft Hook
+          # 0005 beim Build.
+          own='^viperos-'
+          own_count=$(sed 's/#.*//' "$LIST" | tr -d '[:blank:]' \
+                      | grep -cE "$own" || true)
+          echo "Eigene Pakete in der Liste (uebersprungen): $own_count"
+          [ "$own_count" -ge 1 ] || {
+            echo "::error::Kein viperos-Paket in der Liste."
+            echo "  Seit V2 muss viperos-desktop dort stehen, sonst enthaelt"
+            echo "  das ISO weder Hub noch Theme noch Systemvorgaben."
+            exit 1; }
+
           missing=''
           while IFS= read -r line || [ -n "$line" ]; do
             p=$(printf '%s' "${line%%#*}" | tr -d '[:space:]')
             [ -z "$p" ] && continue
+            printf '%s' "$p" | grep -qE "$own" && continue
             apt-cache $APTO show "$p" >/dev/null 2>&1 || missing="$missing $p"
           done < "$LIST"
           if [ -n "$missing" ]; then
@@ -292,7 +310,8 @@ jobs:
           fi
 
           # Einzeln vorhanden reicht nicht - der Satz muss zusammen aufloesen.
-          pkgs=$(sed 's/#.*//' "$LIST" | tr -d '[:blank:]' | grep -v '^$' | tr '\n' ' ')
+          pkgs=$(sed 's/#.*//' "$LIST" | tr -d '[:blank:]' | grep -v '^$' \
+                 | grep -vE "$own" | tr '\n' ' ')
           if ! apt-get $APTO install -y --dry-run --no-install-recommends $pkgs > /tmp/dry.txt 2>&1; then
             echo "::error::Paketsatz loest in Trixie nicht auf"
             grep -iE 'unmet|broken|conflict|^E:' /tmp/dry.txt | head -20
@@ -316,6 +335,24 @@ jobs:
             code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "$url" || echo 000)
             echo "  HTTP $code  $url"
             [ "$code" = "200" ] || { echo "::error::$url nicht erreichbar (HTTP $code)"; bad=1; }
+          done
+
+          # Das eigene Repo. Seit V2 holt Hook 0005 von hier den
+          # Signierschluessel und die ViperOS-Pakete; ist es nicht da,
+          # scheitert der Build im Chroot statt hier in zwei Minuten.
+          VIPEROS_REPO=https://jellystream-app.github.io/viperos-apt
+          for url in \
+            "$VIPEROS_REPO/viperos-archive-keyring.gpg" \
+            "$VIPEROS_REPO/dists/trixie/InRelease" ; do
+            code=$(curl -sSL -o /dev/null -w '%{http_code}' --max-time 30 "$url" || echo 000)
+            echo "  HTTP $code  $url"
+            if [ "$code" != "200" ]; then
+              echo "::error::ViperOS-Repo nicht erreichbar: $url (HTTP $code)"
+              echo "  Der Workflow packages.yml muss mindestens einmal"
+              echo "  erfolgreich gelaufen sein, und unter Settings -> Pages"
+              echo "  muss 'GitHub Actions' als Quelle eingestellt sein."
+              bad=1
+            fi
           done
           exit "$bad"
 
@@ -389,30 +426,32 @@ jobs:
           bad=0
           T=$(mktemp -d)
 
-          # Jeden dconf-Block aus den Hooks extrahieren und einzeln
-          # kompilieren - so, wie das System es spaeter tut.
-          python3 - "$T" <<'PYEOF'
-          import re, sys, pathlib
-          out = pathlib.Path(sys.argv[1])
-          hooks = pathlib.Path('build/lb-config/hooks/live')
-          blocks = [
-              ('local',  r"cat > /etc/dconf/db/local\.d/00-viperos << 'EOF'\n(.*?)\nEOF"),
-              ('gdm',    r"cat > /etc/gdm3/greeter\.dconf-defaults << 'EOF'\n(.*?)\nEOF"),
-          ]
-          found = 0
-          for hook in sorted(hooks.glob('*.hook.chroot')):
-              src = hook.read_text(encoding='utf-8')
-              for name, pat in blocks:
-                  m = re.search(pat, src, re.S)
-                  if m:
-                      d = out / name
-                      d.mkdir(parents=True, exist_ok=True)
-                      (d / '00-viperos').write_text(m.group(1), encoding='utf-8')
-                      print(f"  {hook.name} -> {name} ({len(m.group(1).splitlines())} Zeilen)")
-                      found += 1
-          if not found:
-              print("::warning::keine dconf-Bloecke gefunden")
-          PYEOF
+          # Seit V2 sind das echte Dateien im Paket viperos-settings, keine
+          # Here-Docs in Hooks mehr - die Extraktion per Regex entfaellt.
+          # Wichtig ist dabei die Zaehlung unten: findet sich keine Datei,
+          # MUSS der Schritt scheitern. Vorher stand hier nur eine Warnung,
+          # womit ein Umbau der Pfade die Pruefung stillgelegt haette, ohne
+          # dass es auffaellt.
+          found=0
+          for src in packages/viperos-settings/etc/dconf/db/local.d/00-viperos \
+                     packages/viperos-settings/etc/gdm3/greeter.dconf-defaults; do
+            [ -f "$src" ] || continue
+            case "$src" in
+              *local.d*) name=local ;;
+              *)         name=gdm ;;
+            esac
+            mkdir -p "$T/$name"
+            cp "$src" "$T/$name/00-viperos"
+            echo "  $src -> $name ($(wc -l < "$src") Zeilen)"
+            found=$((found + 1))
+          done
+
+          if [ "$found" -lt 2 ]; then
+            echo "::error::Nur $found von 2 dconf-Dateien gefunden."
+            echo "  Erwartet werden die Systemvorgaben und die GDM-Greeter-Datei"
+            echo "  in packages/viperos-settings/. Wurden sie verschoben?"
+            exit 1
+          fi
 
           for d in "$T"/*/; do
             [ -d "$d" ] || continue
@@ -589,28 +628,28 @@ jobs:
                 tail -60 /build/build.log
                 exit 1
               fi
-              cp "$iso" /output/viperos-1.0-amd64.iso
+              cp "$iso" /output/viperos-2.0-amd64.iso
               cp /build/build.log /output/build.log
               cd /output
-              sha256sum viperos-1.0-amd64.iso > viperos-1.0-amd64.iso.sha256
-              echo "ISO fertig: $(du -h viperos-1.0-amd64.iso | cut -f1)"
+              sha256sum viperos-2.0-amd64.iso > viperos-2.0-amd64.iso.sha256
+              echo "ISO fertig: $(du -h viperos-2.0-amd64.iso | cut -f1)"
             '
 
       - name: Verify ISO
         id: result
         run: |
           set -euo pipefail
-          ISO=output/viperos-1.0-amd64.iso
+          ISO=output/viperos-2.0-amd64.iso
           [ -f "$ISO" ] || { echo "::error::ISO fehlt"; exit 1; }
 
           # Checksumme gegenpruefen, nicht nur erzeugen.
-          ( cd output && sha256sum -c viperos-1.0-amd64.iso.sha256 )
+          ( cd output && sha256sum -c viperos-2.0-amd64.iso.sha256 )
 
           bytes=$(stat -c%s "$ISO")
           mib=$(( bytes / 1024 / 1024 ))
-          sha=$(cut -d' ' -f1 output/viperos-1.0-amd64.iso.sha256)
+          sha=$(cut -d' ' -f1 output/viperos-2.0-amd64.iso.sha256)
 
-          # Eine ISO unter 700 MB kann kein XFCE-Desktop mit ~1600 Paketen sein.
+          # Eine ISO unter 700 MB kann kein GNOME-Desktop mit ~1600 Paketen sein.
           if [ "$mib" -lt 700 ]; then
             echo "::error::ISO ist nur ${mib} MB - der Build ist unvollstaendig"; exit 1
           fi
@@ -634,7 +673,7 @@ jobs:
             echo "Hybrid-Partitionstabelle vorhanden (BIOS + UEFI)."
           fi
 
-          echo "iso-name=viperos-1.0-amd64.iso" >> "$GITHUB_OUTPUT"
+          echo "iso-name=viperos-2.0-amd64.iso" >> "$GITHUB_OUTPUT"
           echo "iso-size=${mib} MB"             >> "$GITHUB_OUTPUT"
           echo "iso-sha256=${sha}"              >> "$GITHUB_OUTPUT"
 
@@ -643,7 +682,7 @@ jobs:
             echo ""
             echo "| | |"
             echo "|---|---|"
-            echo "| Datei | viperos-1.0-amd64.iso |"
+            echo "| Datei | viperos-2.0-amd64.iso |"
             echo "| Groesse | ${mib} MB |"
             echo "| SHA-256 | \`${sha}\` |"
             echo "| Basis | Debian 13 Trixie |"
@@ -654,8 +693,8 @@ jobs:
         with:
           name: viperos-iso
           path: |
-            output/viperos-1.0-amd64.iso
-            output/viperos-1.0-amd64.iso.sha256
+            output/viperos-2.0-amd64.iso
+            output/viperos-2.0-amd64.iso.sha256
           # Hinweis: Der Free-Plan hat nur 500 MB Artifact-Speicher. Eine ~1.8 GB
           # ISO passt dort nicht dauerhaft, daher kurze Aufbewahrung. Fuer
           # dauerhafte Ablage den Workflow mit release=true starten - Releases
@@ -694,7 +733,7 @@ jobs:
         run: |
           set -euo pipefail
           VER="${{ inputs.version }}"
-          [ -z "$VER" ] && VER="1.0-build${{ github.run_number }}"
+          [ -z "$VER" ] && VER="2.0-build${{ github.run_number }}"
           TAG="v${VER}"
 
           # <<-EOF entfernt fuehrende TABS, nicht Leerzeichen. Da YAML mit
@@ -702,8 +741,11 @@ jobs:
           {
             echo "# ViperOS ${VER}"
             echo ""
-            echo "Live-ISO auf Basis von **Debian 13 (Trixie)**, XFCE-Desktop,"
-            echo "Calamares-Installer."
+            echo "Live-ISO auf Basis von **Debian 13 (Trixie)** mit GNOME Shell 48,"
+            echo "eigenem Erscheinungsbild und Calamares-Installer."
+            echo ""
+            echo "Seit 2.0 kommen Hub, Theme und Systemvorgaben aus dem ViperOS-Repo"
+            echo "und lassen sich mit \`apt upgrade\` erneuern - ohne Neuinstallation."
             echo ""
             echo "| | |"
             echo "|---|---|"
@@ -714,7 +756,7 @@ jobs:
             echo "## Pruefen"
             echo ""
             echo '```'
-            echo "sha256sum -c viperos-1.0-amd64.iso.sha256"
+            echo "sha256sum -c viperos-2.0-amd64.iso.sha256"
             echo '```'
             echo ""
             echo "## Live-Zugang"
@@ -729,5 +771,5 @@ jobs:
             --repo "${{ github.repository }}" \
             --title "ViperOS ${VER}" \
             --notes-file notes.md \
-            dist/viperos-1.0-amd64.iso \
-            dist/viperos-1.0-amd64.iso.sha256
+            dist/viperos-2.0-amd64.iso \
+            dist/viperos-2.0-amd64.iso.sha256

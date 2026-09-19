@@ -31,4 +31,24 @@ ff02::1     ip6-allnodes
 ff02::2     ip6-allrouters
 EOF
 
+# ----------------------------------------------------------------------
+# Begruessung an der Textkonsole
+#
+# Steht hier und nicht im Paket viperos-settings, weil sie die
+# Live-Zugangsdaten nennt. Auf einem installierten System gibt es den
+# Benutzer "viperos" nicht mehr - eine motd, die sein Passwort verraet,
+# waere dort falsch und verwirrend.
+#
+# /etc/motd wird von Calamares nicht ueberschrieben, deshalb entfernt der
+# Dienst aus Hook 0018 sie zusammen mit den Live-Sonderrechten.
+# ----------------------------------------------------------------------
+cat > /etc/motd << 'EOF'
+
+  Willkommen bei ViperOS 2.0
+
+  Live-Benutzer: viperos  |  Passwort: viperos
+  Installation: ViperOS Hub oeffnen oder "sudo calamares"
+
+EOF
+
 echo "[ViperosOS] Live-User 'viperos' wurde eingerichtet."

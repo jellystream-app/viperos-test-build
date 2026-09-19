@@ -1,0 +1,7 @@
+[Default Applications]
+text/html=firefox-esr.desktop
+x-scheme-handler/http=firefox-esr.desktop
+x-scheme-handler/https=firefox-esr.desktop
+x-scheme-handler/ftp=firefox-esr.desktop
+application/xhtml+xml=firefox-esr.desktop
+application/xml=firefox-esr.desktop

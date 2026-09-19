@@ -31,10 +31,18 @@ mkdir -p /usr/local/lib/viperos
 
 cat > /usr/local/lib/viperos/drop-live-privileges << 'EOF'
 #!/bin/sh
-# Entfernt die passwortlose sudo-Regel, wenn der Live-Benutzer fehlt.
+# Entfernt die Live-Sonderrechte, wenn der Live-Benutzer fehlt - also auf
+# einem von Calamares installierten System.
 set -u
 if ! id viperos >/dev/null 2>&1; then
     rm -f /etc/sudoers.d/viperos-live
+
+    # Die motd nennt Benutzer und Passwort der Live-Sitzung. Auf einem
+    # installierten System gibt es diesen Zugang nicht mehr; die Meldung
+    # waere irreführend und wuerde ein Passwort nennen, das nirgends gilt.
+    if [ -f /etc/motd ] && grep -q 'Live-Benutzer' /etc/motd; then
+        printf '\n  ViperOS 2.0\n\n' > /etc/motd
+    fi
 fi
 exit 0
 EOF

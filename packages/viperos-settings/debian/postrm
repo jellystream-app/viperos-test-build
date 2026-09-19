@@ -64,8 +64,27 @@ OSEOF
             /etc/default/grub
     fi
 
-    # Das Distributions-Logo wurde in postinst kopiert, nicht ausgeliefert.
-    rm -f /usr/share/icons/hicolor/scalable/places/viperos-logo.svg
+    # Vom postinst ERZEUGTE Dateien. dpkg kennt sie nicht (sie stehen in
+    # keiner Paketliste), wuerde sie also liegen lassen - nach einem purge
+    # blieben sonst ViperOS-Logos auf einem System zurueck, das kein ViperOS
+    # mehr ist. Aufgefallen bei einem Install-purge-Durchlauf.
+    rm -f /usr/share/icons/hicolor/scalable/places/viperos-logo.svg \
+          /usr/share/pixmaps/viperos.png \
+          /usr/share/viperos/user-icon.png \
+          /usr/share/calamares/branding/viperos/viperos-icon.png \
+          /usr/share/calamares/branding/viperos/viperos-logo.png \
+          /etc/issue.net
+    # Nur entfernen, wenn leer - andere Pakete koennen dort ablegen.
+    rmdir --ignore-fail-on-non-empty \
+          /usr/share/calamares/branding/viperos \
+          /usr/share/viperos 2>/dev/null || true
+
+    # /etc/issue nannte ViperOS; Debians Standard wiederherstellen.
+    if [ -f /etc/issue ] && grep -q 'ViperOS' /etc/issue; then
+        printf 'Debian GNU/Linux %s \\n \\l\n\n' \
+            "$(cat /etc/debian_version 2>/dev/null || echo '13')" > /etc/issue
+        cp /etc/issue /etc/issue.net
+    fi
 
     # Die dconf-Datenbank neu bauen, damit die Vorgaben wirklich verschwinden.
     # Die Klartextdatei hat dpkg schon entfernt; ohne "dconf update" bliebe

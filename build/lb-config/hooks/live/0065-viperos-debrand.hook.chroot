@@ -1,23 +1,32 @@
 #!/bin/bash
-# ViperosOS - Debian-Branding entfernen
+# ViperosOS - Debian-Branding aus dem Image entfernen
+#
+# Dieser Hook bleibt bewusst ein Hook und wird NICHT zu einem Paket: er
+# LOESCHT Dateien, die ein anderes Paket (desktop-base) mitbringt. Ein Paket,
+# das Dateien fremder Pakete entfernt, waere ein Policy-Verstoss - dpkg wuerde
+# sie beim naechsten Update von desktop-base ohnehin zurueckbringen. Im
+# Image-Bau ist das Loeschen dagegen genau richtig, weil das Ergebnis
+# eingefroren wird.
 #
 # Woher die Debian-Optik kommt:
 #
 #   desktop-base (483 Dateien, 22 MB) liefert zehn Debian-Themes samt
-#   Hintergruenden - ceratopsian, emerald, futureprototype, homeworld,
-#   joy, joy-inksplat, lines, moonlight, softwaves, spacefun. Jedes bringt
-#   eine eigene XML in /usr/share/gnome-background-properties/ mit, und
-#   genau die fuellen die Hintergrund-Auswahl in den Einstellungen.
+#   Hintergruenden - ceratopsian, emerald, futureprototype, homeworld, joy,
+#   joy-inksplat, lines, moonlight, softwaves, spacefun. Jedes bringt eine
+#   eigene XML in /usr/share/gnome-background-properties/ mit, und genau die
+#   fuellen die Hintergrund-Auswahl in den Einstellungen.
 #
-#   Zusaetzlich setzt 10_desktop-base.gschema.override den Standard-
-#   Hintergrund auf Debians desktop-background.xml - das ueberschreibt
-#   unsere dconf-Vorgabe, weil gschema.override fruehe Prioritaet hat.
+# desktop-base laesst sich NICHT deinstallieren: gnome-control-center hat es
+# als hartes Depends. Also bleibt das Paket, seine Inhalte gehen.
 #
-# desktop-base laesst sich NICHT deinstallieren: gnome-control-center hat
-# es als hartes Depends. Also bleibt das Paket, seine Inhalte gehen.
+# Was dieser Hook seit V2 NICHT mehr macht (das liegt in viperos-settings):
+#   - 90_viperos.gschema.override schreiben
+#   - os-release setzen
+#   - das Logo als Distributions-Icon ablegen
+#   - GRUB_DISTRIBUTOR aendern
 #
-# Wichtig: Alles hier passiert VOR Hook 0090 (Cleanup) und NACH 0060
-# (Branding), damit die ViperOS-Dateien schon existieren.
+# Reihenfolge: nach der Paketinstallation (die ViperOS-Dateien muessen schon
+# existieren) und vor Hook 0090 (Cleanup).
 
 set -e
 
@@ -37,6 +46,11 @@ for f in /usr/share/gnome-background-properties/*.xml; do
 done
 echo "  Hintergrund-Kataloge entfernt: $removed"
 
+if [ ! -f /usr/share/gnome-background-properties/viperos.xml ]; then
+    echo "  WARNUNG: viperos.xml fehlt - die Hintergrund-Auswahl bleibt leer."
+    echo "  Ist viperos-desktop-theme installiert?"
+fi
+
 # Die Bilddaten selbst (22 MB) ebenfalls loeschen.
 for d in /usr/share/desktop-base/*-theme; do
     [ -d "$d" ] || continue
@@ -46,40 +60,24 @@ rm -rf /usr/share/images/desktop-base
 echo "  Debian-Theme-Verzeichnisse entfernt"
 
 # ----------------------------------------------------------------------
-# 2. Die gschema.override neutralisieren
+# 2. Debians gschema.override neutralisieren
 #
-# Sie zwingt den Hintergrund auf Debians XML. Statt sie zu loeschen (das
-# Paket wuerde sie bei einem Update zurueckbringen) wird sie durch eine
-# eigene mit hoeherer Nummer ueberschrieben - 90 gewinnt gegen 10.
+# 10_desktop-base.gschema.override zwingt den Hintergrund auf Debians XML.
+# Das eigene 90_viperos.gschema.override (aus viperos-settings) gewinnt
+# bereits, weil 90 nach 10 gelesen wird; Debians Datei wird zusaetzlich
+# geleert, damit sie gar nichts mehr setzt.
 # ----------------------------------------------------------------------
-cat > /usr/share/glib-2.0/schemas/90_viperos.gschema.override << 'EOF'
-[org.gnome.desktop.background]
-picture-options='zoom'
-picture-uri='file:///usr/share/backgrounds/viperos/viperos-slate.jpg'
-picture-uri-dark='file:///usr/share/backgrounds/viperos/viperos-slate.jpg'
-primary-color='#20232c'
-secondary-color='#4a5769'
-
-[org.gnome.desktop.screensaver]
-picture-options='zoom'
-picture-uri='file:///usr/share/backgrounds/viperos/viperos-slate.jpg'
-primary-color='#20232c'
-secondary-color='#4a5769'
-
-[org.gnome.desktop.interface]
-color-scheme='prefer-dark'
-accent-color='blue'
-EOF
-
-# Debians Override zusaetzlich leeren, damit sie nichts mehr setzt.
 if [ -f /usr/share/glib-2.0/schemas/10_desktop-base.gschema.override ]; then
     : > /usr/share/glib-2.0/schemas/10_desktop-base.gschema.override
     echo "  10_desktop-base.gschema.override geleert"
 fi
 
-glib-compile-schemas /usr/share/glib-2.0/schemas/ >/dev/null 2>&1 && \
-    echo "  GSettings-Schemata neu kompiliert" || \
-    echo "  WARNUNG: glib-compile-schemas fehlgeschlagen"
+# Nach dem Leeren neu kompilieren, sonst bleibt der alte Wert wirksam.
+if command -v glib-compile-schemas >/dev/null 2>&1; then
+    glib-compile-schemas /usr/share/glib-2.0/schemas/ >/dev/null 2>&1 \
+        && echo "  GSettings-Schemata neu kompiliert" \
+        || echo "  WARNUNG: glib-compile-schemas fehlgeschlagen"
+fi
 
 # ----------------------------------------------------------------------
 # 3. Debian-Verknuepfungen aus dem Anwendungsmenue
@@ -93,40 +91,11 @@ rm -f /usr/share/applications/debian-homepage.desktop \
 echo "  Debian-Menueeintraege entfernt"
 
 # ----------------------------------------------------------------------
-# 4. Logo fuer den GNOME-"Ueber"-Dialog
-#
-# /etc/os-release verweist mit LOGO=viperos-logo auf ein Icon dieses
-# Namens. Ohne passende Datei zeigt der Dialog gar nichts. Debian legt
-# sein Pendant unter icons/hicolor/SIZE/places/ ab - dem folgen wir.
+# 4. Debian-Embleme und GRUB-Themes
 # ----------------------------------------------------------------------
-if [ -f /usr/share/icons/hicolor/scalable/apps/viperos.svg ]; then
-    for size in 64x64 128x128 256x256 scalable; do
-        mkdir -p "/usr/share/icons/hicolor/$size/places"
-    done
-    cp /usr/share/icons/hicolor/scalable/apps/viperos.svg \
-       /usr/share/icons/hicolor/scalable/places/viperos-logo.svg
-    for size in 64 128 256; do
-        src="/usr/share/viperos/user-icon.png"
-        [ -f "$src" ] || continue
-        if command -v convert >/dev/null 2>&1; then
-            convert "$src" -resize "${size}x${size}" \
-                "/usr/share/icons/hicolor/${size}x${size}/places/viperos-logo.png" 2>/dev/null || true
-        else
-            python3 - "$src" "$size" << 'PYEOF' 2>/dev/null || true
-import sys
-from PIL import Image
-src, size = sys.argv[1], int(sys.argv[2])
-im = Image.open(src).convert("RGBA").resize((size, size), Image.LANCZOS)
-im.save(f"/usr/share/icons/hicolor/{size}x{size}/places/viperos-logo.png")
-PYEOF
-        fi
-    done
-    echo "  viperos-logo als Distributions-Icon abgelegt"
-fi
-
-# Debian-Embleme entfernen, damit sie nicht in Dialogen auftauchen.
 rm -rf /usr/share/icons/desktop-base
 find /usr/share/icons/hicolor -name 'emblem-debian*' -delete 2>/dev/null || true
+rm -f /boot/grub/themes/debian* 2>/dev/null || true
 
 # Icon-Zwischenspeicher neu aufbauen, sonst bleibt das alte Logo sichtbar.
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then
@@ -134,25 +103,18 @@ if command -v gtk-update-icon-cache >/dev/null 2>&1; then
 fi
 
 # ----------------------------------------------------------------------
-# 5. os-release auch unter /usr/lib schreiben
+# 5. Gegenpruefung: hat viperos-settings seine Arbeit getan?
 #
-# /etc/os-release ist ein Symlink nach ../usr/lib/os-release. "cat >"
-# schreibt durch den Symlink, beide Pfade stimmen also bereits ueberein -
-# hier nur zur Sicherheit gegenpruefen und melden.
+# Die postinst des Pakets schreibt os-release. Laeuft sie nicht (etwa weil
+# das Paket fehlt), traegt das Image weiterhin Debian-Daten - und das faellt
+# sonst erst im gebooteten System auf.
 # ----------------------------------------------------------------------
-if grep -q 'ViperosOS' /usr/lib/os-release 2>/dev/null; then
-    echo "  /usr/lib/os-release traegt ViperOS-Daten"
+if grep -q '^ID=viperos' /usr/lib/os-release 2>/dev/null; then
+    echo "  os-release traegt ViperOS-Daten"
 else
-    echo "  WARNUNG: /usr/lib/os-release enthaelt noch Debian-Daten"
-    cp /etc/os-release /usr/lib/os-release 2>/dev/null || true
-fi
-
-# ----------------------------------------------------------------------
-# 6. GRUB-Branding
-# ----------------------------------------------------------------------
-rm -f /boot/grub/themes/debian* 2>/dev/null || true
-if [ -f /etc/default/grub ]; then
-    sed -i 's/^GRUB_DISTRIBUTOR=.*/GRUB_DISTRIBUTOR="ViperOS"/' /etc/default/grub
+    echo "  FEHLER: /usr/lib/os-release enthaelt noch Debian-Daten."
+    echo "  Die postinst von viperos-settings ist nicht gelaufen."
+    exit 1
 fi
 
 echo "[ViperosOS] Debian-Branding entfernt."

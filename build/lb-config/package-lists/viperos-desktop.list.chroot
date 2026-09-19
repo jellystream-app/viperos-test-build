@@ -72,7 +72,8 @@ gnome-disk-utility
 gnome-tweaks
 gnome-shell-extension-manager
 # dconf-cli liefert "dconf update" - damit werden die systemweiten
-# Vorgaben aus /etc/dconf/db/local.d/ kompiliert (Hook 0025).
+# Vorgaben aus /etc/dconf/db/local.d/ kompiliert. Das ruft seit V2 die
+# postinst von viperos-settings auf, nicht mehr ein Build-Hook.
 dconf-cli
 dconf-gsettings-backend
 # Mutter braucht diese Daten; ohne sie startet die Shell nicht.
@@ -82,7 +83,7 @@ gnome-themes-extra
 # Portale fuer Flatpaks (Datei-Dialoge, Screenshots) unter GNOME
 xdg-desktop-portal-gnome
 
-# --- GNOME-Erweiterungen (UUIDs in Hook 0025 aktiviert) ---
+# --- GNOME-Erweiterungen (aktiviert durch viperos-settings) ---
 # dash-to-dock@micxgx.gmail.com        - Dock am unteren Rand
 gnome-shell-extension-dashtodock
 # ubuntu-appindicators@ubuntu.com      - Tray-Symbole (Discord, KeePassXC)
@@ -93,6 +94,26 @@ gnome-shell-extension-blur-my-shell
 gnome-shell-extension-desktop-icons-ng
 # user-theme@...gcampax.github.com     - laedt /usr/share/themes/ViperOS
 gnome-shell-extension-user-theme
+
+# ============================================================
+# --- ViperOS (eigene Pakete, seit V2) ---
+#
+# Ein Eintrag statt vieler Hook-Zeilen: das Metapaket zieht
+#
+#   viperos-settings          dconf-Vorgaben, Branding, Paketquelle
+#   viperos-desktop-theme     Shell-Theme, Hintergruende, GTK-Farben
+#   viperos-panel-extension   eigene Shell-Erweiterung
+#   viperos-hub               Systemzentrale
+#
+# nach sich. Alles davon entstand bis V1 in den Build-Hooks und war nach der
+# Installation eingefroren; jetzt kommt es aus dem ViperOS-Repo und laesst
+# sich mit "apt upgrade" erneuern.
+#
+# Die Quelle dafuer traegt Hook 0005 ein, der VOR der Paketinstallation
+# laeuft. Ist das Repository nicht erreichbar, bricht dieser Hook mit einer
+# eindeutigen Meldung ab - nicht erst apt mit "Unable to locate package".
+# ============================================================
+viperos-desktop
 
 # --- Login Manager ---
 gdm3
@@ -176,7 +197,7 @@ fonts-liberation
 fonts-noto
 fonts-noto-color-emoji
 # Inter ist die Oberflaechenschrift von ViperOS (modern, gut lesbar in
-# kleinen Groessen). Wird in Hook 0025 als font-name gesetzt.
+# kleinen Groessen). Wird von viperos-settings als font-name gesetzt.
 fonts-inter
 # Monospace fuer Terminal und Editor
 fonts-jetbrains-mono

@@ -1,0 +1,95 @@
+#!/bin/bash
+# ViperosOS - eigene Paketquelle eintragen
+#
+# Dieser Hook laeuft VOR allen anderen (0005), weil die ViperOS-Pakete aus
+# dieser Quelle kommen. Ohne sie wuerde "viperos-desktop" in der Paketliste
+# nicht gefunden und der Build scheitern.
+#
+# Warum der Eintrag hier steht und nicht nur im Paket viperos-settings:
+# Das ist ein Henne-Ei-Problem. viperos-settings BRINGT die Quelle mit, aber
+# um das Paket zu installieren, muss die Quelle bereits bekannt sein. Also
+# wird sie hier vorab eingetragen; sobald viperos-settings installiert ist,
+# ueberschreibt es diese Datei mit einer identischen Fassung und ist danach
+# ihr Besitzer. Das ist Absicht - auf dem installierten System soll dpkg die
+# Quelle verwalten, nicht ein Build-Hook.
+
+set -e
+
+echo "[ViperosOS] Trage ViperOS-Paketquelle ein..."
+
+KEYRING=/usr/share/keyrings/viperos-archive-keyring.gpg
+REPO_URL="https://jellystream-app.github.io/viperos-apt"
+
+mkdir -p /usr/share/keyrings /etc/apt/sources.list.d
+
+# ----------------------------------------------------------------------
+# Signierschluessel holen
+#
+# Der Schluessel liegt im Repository selbst. Das ist unbedenklich, weil der
+# Build ueber HTTPS laeuft und der Schluessel nur den oeffentlichen Teil
+# enthaelt - er dient dazu, die Signatur zu PRUEFEN, nicht sie zu erzeugen.
+# ----------------------------------------------------------------------
+if ! curl -fsSL --retry 3 --proto '=https' -o "$KEYRING" \
+        "$REPO_URL/viperos-archive-keyring.gpg"; then
+    echo "  FEHLER: Signierschluessel nicht erreichbar unter"
+    echo "    $REPO_URL/viperos-archive-keyring.gpg"
+    echo ""
+    echo "  Ist das Repository veroeffentlicht? Der Workflow packages.yml"
+    echo "  muss mindestens einmal erfolgreich gelaufen sein, und unter"
+    echo "  Settings -> Pages muss 'GitHub Actions' als Quelle stehen."
+    exit 1
+fi
+
+# Der Schluessel muss binaer sein, nicht ASCII-armored: apt liest unter
+# Signed-By nur ein Keyring im Binaerformat. Ein versehentlich armored
+# Schluessel fuehrt zu "no valid OpenPGP data found" - erst beim Update.
+if head -c 30 "$KEYRING" | grep -q 'BEGIN PGP'; then
+    echo "  Schluessel ist ASCII-armored - konvertiere nach binaer"
+    gpg --dearmor < "$KEYRING" > "$KEYRING.bin" && mv "$KEYRING.bin" "$KEYRING"
+fi
+
+# Ein privater Schluessel darf hier unter keinen Umstaenden landen.
+if grep -qa 'PRIVATE KEY BLOCK\|SECRET KEY BLOCK' "$KEYRING"; then
+    echo "  FEHLER: Der geholte Schluessel enthaelt privates Material."
+    exit 1
+fi
+
+chmod 0644 "$KEYRING"
+echo "  Schluessel: $(stat -c%s "$KEYRING") Bytes"
+
+# ----------------------------------------------------------------------
+# Quelle eintragen (deb822-Format)
+#
+# Kommentare beginnen mit "#", NICHT mit "//" - mit "//" meldet apt
+# "Malformed stanza" und ignoriert die Datei stillschweigend.
+# ----------------------------------------------------------------------
+cat > /etc/apt/sources.list.d/viperos.sources << EOF
+# ViperOS-Paketquelle (vorab durch Hook 0005; spaeter von viperos-settings
+# verwaltet). Ueber diese Quelle kommen Hub, Theme, Erweiterung und
+# Systemvorgaben - auch auf bereits installierte Systeme.
+Types: deb
+URIs: ${REPO_URL}
+Suites: trixie
+Components: main
+Architectures: amd64
+Signed-By: ${KEYRING}
+EOF
+
+apt-get update
+
+# Gegenpruefen, dass die Quelle wirklich gelesen wurde. Ohne diese Kontrolle
+# faellt ein Signaturfehler erst auf, wenn apt-get install das Paket nicht
+# findet - mit einer Meldung, die auf die Paketliste zeigt statt auf die
+# Quelle.
+if apt-cache policy viperos-desktop 2>/dev/null | grep -q 'ViperOS'; then
+    echo "  Quelle aktiv - viperos-desktop ist sichtbar:"
+    apt-cache policy viperos-desktop | sed -n '1,4p;/ViperOS/p' | sed 's/^/    /'
+else
+    echo "  FEHLER: viperos-desktop ist nicht sichtbar."
+    echo "  Entweder ist das Repository leer, oder die Signatur passt nicht"
+    echo "  zum ausgelieferten Schluessel."
+    apt-cache policy viperos-desktop 2>&1 | sed 's/^/    /'
+    exit 1
+fi
+
+echo "[ViperosOS] ViperOS-Paketquelle eingetragen."

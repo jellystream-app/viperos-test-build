@@ -74,7 +74,88 @@ OSEOF
     fi
 
     # ------------------------------------------------------------------
-    # GRUB-Distributor
+    # Logo-Ableitungen als PNG
+    #
+    # Nicht jede Stelle liest SVG: Calamares-Branding und Benutzerbilder
+    # brauchen PNG. Aus einer grossen Quelle herunterskaliert ergibt das
+    # weiche Kanten statt harter Treppen.
+    # ------------------------------------------------------------------
+    if [ -f /usr/share/icons/hicolor/scalable/apps/viperos.svg ] \
+       && command -v python3 >/dev/null 2>&1; then
+        mkdir -p /usr/share/pixmaps /usr/share/viperos \
+                 /usr/share/calamares/branding/viperos
+        python3 - << 'PYEOF' 2>/dev/null || \
+            echo "viperos-settings: PNG-Logos nicht erzeugt (python3-pil fehlt?)" >&2
+from PIL import Image, ImageDraw
+
+def logo(size):
+    s = size / 192.0
+    img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle((0, 0, size - 1, size - 1),
+                        radius=int(34 * s), fill=(16, 24, 39, 255))
+    d.rounded_rectangle((int(22 * s), int(22 * s), int(170 * s), int(170 * s)),
+                        radius=int(28 * s), outline=(85, 165, 247, 255),
+                        width=max(2, int(8 * s)))
+    d.line((int(62 * s), int(68 * s), int(96 * s), int(132 * s),
+            int(134 * s), int(68 * s)),
+           fill=(231, 238, 249, 255), width=max(3, int(11 * s)), joint='curve')
+    return img
+
+base = logo(768)
+for path, size in [
+    ('/usr/share/viperos/user-icon.png', 256),
+    ('/usr/share/pixmaps/viperos.png', 256),
+    ('/usr/share/calamares/branding/viperos/viperos-icon.png', 256),
+    ('/usr/share/calamares/branding/viperos/viperos-logo.png', 512),
+]:
+    base.resize((size, size), Image.LANCZOS).save(path, optimize=True)
+PYEOF
+    fi
+
+    # ------------------------------------------------------------------
+    # Firefox als ViperOS Browser
+    #
+    # /usr/share/applications/firefox-esr.desktop gehoert dem Paket
+    # firefox-esr - als Paketdatei waere das ein dpkg-Dateikonflikt, genau
+    # wie bei os-release. Deshalb wird die Datei hier geschrieben.
+    #
+    # Beim naechsten Update von firefox-esr ueberschreibt Debian sie wieder.
+    # Das ist hingenommen: die Umbenennung ist kosmetisch, und ein
+    # dpkg-divert waere der Preis eines dauerhaften Eingriffs in ein
+    # fremdes Paket nicht wert.
+    # ------------------------------------------------------------------
+    if [ -f /usr/share/applications/firefox-esr.desktop ]; then
+        sed -i \
+            -e 's/^Name=.*/Name=ViperOS Browser/' \
+            -e 's/^Name\[de\]=.*/Name[de]=ViperOS Browser/' \
+            -e 's/^GenericName=.*/GenericName=ViperOS Web Browser/' \
+            -e 's/^GenericName\[de\]=.*/GenericName[de]=ViperOS Webbrowser/' \
+            /usr/share/applications/firefox-esr.desktop
+    fi
+
+    # Firefox als Standardbrowser. Die Alternativen existieren nur, wenn
+    # firefox-esr installiert ist - daher ohne Abbruch bei Fehlschlag.
+    if [ -x /usr/bin/firefox-esr ]; then
+        update-alternatives --set x-www-browser /usr/bin/firefox-esr \
+            >/dev/null 2>&1 || true
+        update-alternatives --set gnome-www-browser /usr/bin/firefox-esr \
+            >/dev/null 2>&1 || true
+    fi
+
+    # ------------------------------------------------------------------
+    # Konsolen-Kennung
+    # ------------------------------------------------------------------
+    cat > /etc/issue << 'ISSUEEOF'
+
+  ViperOS 2.0 - Based on Debian 13 (Trixie)
+  \l
+
+ISSUEEOF
+    cp /etc/issue /etc/issue.net
+
+    # ------------------------------------------------------------------
+    # GRUB
     #
     # /etc/default/grub gehoert dem Paket grub-common und wird deshalb nur
     # bearbeitet, nicht ersetzt.
@@ -85,6 +166,11 @@ OSEOF
                 /etc/default/grub
         else
             echo 'GRUB_DISTRIBUTOR="ViperOS"' >> /etc/default/grub
+        fi
+        # Hintergrundbild des Bootmenues, falls das Theme-Paket es liefert.
+        BG=/usr/share/backgrounds/viperos/viperos-slate.jpg
+        if [ -f "$BG" ] && ! grep -q '^GRUB_BACKGROUND=' /etc/default/grub; then
+            echo "GRUB_BACKGROUND=\"$BG\"" >> /etc/default/grub
         fi
     fi
     ;;
