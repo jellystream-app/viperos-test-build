@@ -389,9 +389,15 @@ jobs:
             echo "  HTTP $code  $url"
             if [ "$code" != "200" ]; then
               echo "::error::ViperOS-Repo nicht erreichbar: $url (HTTP $code)"
-              echo "  Der Workflow packages.yml muss mindestens einmal"
-              echo "  erfolgreich gelaufen sein, und unter Settings -> Pages"
-              echo "  muss 'GitHub Actions' als Quelle eingestellt sein."
+              echo "  Es braucht beides:"
+              echo "    1. Der Workflow 'Build ViperOS packages' muss einmal"
+              echo "       erfolgreich gelaufen sein - er pusht nach"
+              echo "       jellystream-app/viperos-apt, Branch gh-pages."
+              echo "    2. In JENEM Repository unter Settings -> Pages:"
+              echo "       Source 'Deploy from a branch', Branch 'gh-pages',"
+              echo "       Ordner '/ (root)'."
+              echo "  Dort NICHT 'GitHub Actions' waehlen - der Inhalt kommt"
+              echo "  als Push in den Branch, nicht als Pages-Deployment."
               bad=1
             fi
           done
