@@ -1,9 +1,9 @@
 {
   "uuid": "viperos-panel@viperos.os",
-  "name": "ViperOS Floating Panel",
-  "description": "Verschiebt die obere Leiste vom Bildschirmrand weg und rundet ihre Ecken ab. Reines CSS reicht dafuer nicht: St wertet margin an #panel nicht aus, weil die Shell die Leiste selbst positioniert.",
+  "name": "ViperOS Panel",
+  "description": "Berechnet nach dem Laden die Arbeitsflaechen-Regionen neu, damit Desktop-Symbole unterhalb der oberen Leiste beginnen statt darunter zu verschwinden. Das Aussehen der Leiste bleibt unberuehrt - das steht im ViperOS-Theme.",
   "shell-version": ["48"],
   "version": 1,
   "session-modes": ["user"],
-  "url": "https://viperos.os/"
+  "url": "https://viperos.radionet.app/"
 }
