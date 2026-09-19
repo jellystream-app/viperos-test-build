@@ -132,19 +132,31 @@ height-fraction=0.9
 
 [org/gnome/shell/extensions/blur-my-shell]
 hacks-level=1
+
+# Panel-Blur AUS - das ist der Grund, warum die Ecken der Leiste eckig
+# blieben: blur-my-shell schiebt ein eigenes Widget hinter das Panel
+# (components/panel.js: panel_box.insert_child_at_index(background_group, 0))
+# und setzt dessen Groesse exakt auf die Panel-Maße. Dieses Widget ist
+# RECHTECKIG - einen corner-radius gibt es im Schema nur fuer
+# dash-to-dock, nicht fuer das Panel. Unsere abgerundeten Ecken sind
+# zwar transparent, aber dahinter deckt das Blur-Widget, also sieht man
+# weiterhin eine eckige Leiste.
 [org/gnome/shell/extensions/blur-my-shell/panel]
-blur=true
-brightness=0.6
-sigma=30
-static-blur=true
+blur=false
+override-background=false
 [org/gnome/shell/extensions/blur-my-shell/overview]
 blur=true
 brightness=0.6
 sigma=30
+# Beim Dock funktioniert der Blur mit runden Ecken, weil blur-my-shell
+# hier einen corner-radius kennt (Standard 12) - der Wert passt zur
+# Rundung des Docks.
 [org/gnome/shell/extensions/blur-my-shell/dash-to-dock]
 blur=true
 brightness=0.6
 sigma=30
+corner-radius=22
+static-blur=true
 [org/gnome/shell/extensions/blur-my-shell/applications]
 blur=false
 
