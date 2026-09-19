@@ -1,0 +1,341 @@
+name: Build ViperOS packages and publish APT repository
+
+# Baut die Pakete aus packages/ und veroeffentlicht sie als signiertes
+# APT-Repository auf GitHub Pages. Erst dadurch erreichen Aktualisierungen ein
+# bereits INSTALLIERTES ViperOS - bis V1 entstand alles Eigene nur beim
+# ISO-Bau und war nach der Installation eingefroren.
+#
+# Ein APT-Repository ist nichts als ein Baum statischer Dateien plus
+# GPG-Signatur, deshalb genuegt Pages: kostenlos, HTTPS inklusive, kein
+# Traffic-Limit fuer oeffentliche Repositories.
+#
+# Vor dem ersten Lauf sind zwei Dinge einzurichten:
+#   1. Settings -> Pages -> Source: "GitHub Actions"
+#   2. Settings -> Secrets and variables -> Actions -> New secret:
+#      APT_SIGNING_KEY = der private Schluessel, ASCII-armored
+#      (live-test/make-signing-key.sh erzeugt ihn)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/**'
+      - '.github/workflows/packages.yml'
+  pull_request:
+    paths:
+      - 'packages/**'
+      - '.github/workflows/packages.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: apt-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Stufe 1: Pakete bauen. Laeuft bei jedem Push und bei Pull Requests, damit
+  # ein Fehler im Paketbau auffaellt, bevor etwas veroeffentlicht wird.
+  # ---------------------------------------------------------------------------
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build packages in Debian Trixie
+        run: |
+          # MUSS im Trixie-Container laufen, nicht auf dem Ubuntu-Runner:
+          # debhelper-compat (= 13) und die Abhaengigkeitsnamen muessen zur
+          # Zieldistribution passen. Ein Bau auf Ubuntu kann Pakete erzeugen,
+          # die in Trixie nicht aufloesen.
+          docker run --rm -v "$PWD:/src" -e DEBIAN_FRONTEND=noninteractive \
+            debian:trixie bash -euo pipefail -c '
+              apt-get update -qq
+              apt-get install -y --no-install-recommends \
+                build-essential debhelper dpkg-dev fakeroot lintian >/dev/null
+              echo "debhelper: $(dpkg-query -W -f="\${Version}" debhelper)"
+              /src/packages/build-all.sh
+            '
+
+      - name: Verify built packages
+        run: |
+          set -euo pipefail
+          count=$(find packages/out -name '*.deb' | wc -l)
+          echo "Gebaute Pakete: $count"
+          [ "$count" -ge 5 ] || { echo "::error::Erwartet werden 5 Pakete, gefunden $count"; exit 1; }
+
+          bad=0
+          for deb in packages/out/*.deb; do
+            name=$(dpkg-deb -f "$deb" Package)
+            ver=$(dpkg-deb -f "$deb" Version)
+            arch=$(dpkg-deb -f "$deb" Architecture)
+            echo "--- $name $ver ($arch)"
+
+            # Architecture muss "all" sein: die Pakete enthalten nur Python,
+            # CSS, JS und Bilder, nichts Compiliertes.
+            [ "$arch" = "all" ] || { echo "::error::$name ist $arch, erwartet all"; bad=1; }
+
+            # Kein Paket darf nach /usr/local oder /opt installieren.
+            if dpkg-deb -c "$deb" | grep -E '\./(usr/local|opt)/'; then
+              echo "::error::$name installiert nach /usr/local oder /opt"
+              bad=1
+            fi
+
+            # Ein privater Schluessel im Paket waere fatal.
+            if dpkg-deb --fsys-tarfile "$deb" | grep -qa 'PRIVATE KEY BLOCK'; then
+              echo "::error::$name enthaelt einen privaten Schluessel"
+              bad=1
+            fi
+          done
+          exit "$bad"
+
+      - name: Check theme stylesheet size
+        run: |
+          # Das Shell-Theme ERSETZT GNOMEs Stylesheet (Main.setThemeStylesheet).
+          # Ein zu kleines Theme laesst darum tausende Regeln weg und die
+          # Oberflaeche faellt auf St-Voreinstellungen zurueck - sichtbar als
+          # Leiste ohne Rundung. debian/rules prueft das schon, hier wird das
+          # Ergebnis im fertigen .deb gegengeprueft.
+          deb=$(find packages/out -name 'viperos-desktop-theme_*.deb' -print -quit)
+          [ -n "$deb" ] || { echo "::error::Theme-Paket fehlt"; exit 1; }
+          size=$(dpkg-deb -c "$deb" \
+                 | awk '/gnome-shell\/gnome-shell\.css$/ {print $3}')
+          echo "gnome-shell.css im Paket: ${size:-0} Bytes"
+          [ -n "$size" ] || { echo "::error::gnome-shell.css fehlt im Paket"; exit 1; }
+          [ "$size" -gt 150000 ] || {
+            echo "::error::Nur $size Bytes - GNOMEs Basis-CSS fehlt"; exit 1; }
+
+      - name: Lintian report
+        continue-on-error: true
+        run: |
+          # Nur als Bericht: lintian meldet auch Stilfragen, die keinen Build
+          # aufhalten sollen. Echte Fehler faengt der Schritt oben ab.
+          docker run --rm -v "$PWD:/src" debian:trixie bash -c '
+            apt-get update -qq && apt-get install -y --no-install-recommends lintian >/dev/null
+            lintian --no-tag-display-limit /src/packages/out/*.deb 2>&1 | head -40
+          ' || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: viperos-debs
+          path: packages/out/*.deb
+          retention-days: 5
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Stufe 2: Repository bauen und auf Pages veroeffentlichen. Nur auf main -
+  # ein Pull Request soll die Quelle, aus der alle Systeme aktualisieren,
+  # nicht veraendern koennen.
+  # ---------------------------------------------------------------------------
+  publish:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: viperos-debs
+          path: debs
+
+      - name: Check for signing key
+        run: |
+          if [ -z "${{ secrets.APT_SIGNING_KEY }}" ]; then
+            echo "::error::Das Secret APT_SIGNING_KEY fehlt."
+            echo ""
+            echo "Ohne Signatur verweigert apt die Quelle, das Repository waere"
+            echo "also nutzlos. Einrichten:"
+            echo "  1. bash live-test/make-signing-key.sh  (erzeugt das Paar)"
+            echo "  2. Settings -> Secrets and variables -> Actions"
+            echo "  3. New repository secret: APT_SIGNING_KEY"
+            echo "     Inhalt: /tmp/viperos-keys/private-key.asc"
+            exit 1
+          fi
+          echo "APT_SIGNING_KEY vorhanden."
+
+      - name: Build signed APT repository
+        env:
+          SIGNING_KEY: ${{ secrets.APT_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends apt-utils gnupg >/dev/null
+
+          # Verzeichnisbaum eines APT-Repositories. "binary-all" passt zu
+          # Architecture: all; zusaetzlich werden unten Verweise fuer amd64
+          # angelegt, weil apt die Architektur des Systems anfragt.
+          mkdir -p repo/dists/trixie/main/binary-all
+          mkdir -p repo/dists/trixie/main/binary-amd64
+          mkdir -p repo/pool/main
+
+          # Pakete einsortieren: pool/main/<Anfangsbuchstabe>/<Quellpaket>/
+          for deb in debs/*.deb; do
+            name=$(dpkg-deb -f "$deb" Package)
+            letter=$(printf '%s' "$name" | cut -c1)
+            dest="repo/pool/main/$letter/$name"
+            mkdir -p "$dest"
+            cp "$deb" "$dest/"
+            echo "  $name -> ${dest#repo/}"
+          done
+
+          cd repo
+
+          # Packages-Index. apt-ftparchive traegt Groesse und Pruefsummen ein;
+          # die Pfade darin sind relativ zur Repository-Wurzel.
+          apt-ftparchive packages pool/main > dists/trixie/main/binary-all/Packages
+          gzip -9kf dists/trixie/main/binary-all/Packages
+
+          # amd64 bekommt denselben Index. Architecture-all-Pakete stehen in
+          # binary-all, aber apt fragt zuerst den Index seiner eigenen
+          # Architektur an - fehlt der, meldet es einen Fehler, obwohl die
+          # Pakete vorhanden sind.
+          cp dists/trixie/main/binary-all/Packages    dists/trixie/main/binary-amd64/Packages
+          cp dists/trixie/main/binary-all/Packages.gz dists/trixie/main/binary-amd64/Packages.gz
+
+          n=$(grep -c '^Package: ' dists/trixie/main/binary-all/Packages)
+          echo "Packages-Index: $n Pakete"
+
+          # Release-Datei. Die Felder muessen zur .sources-Datei im Paket
+          # viperos-settings passen, sonst lehnt apt das Repository ab.
+          apt-ftparchive \
+            -o APT::FTPArchive::Release::Origin="ViperOS" \
+            -o APT::FTPArchive::Release::Label="ViperOS" \
+            -o APT::FTPArchive::Release::Suite="trixie" \
+            -o APT::FTPArchive::Release::Codename="trixie" \
+            -o APT::FTPArchive::Release::Architectures="all amd64" \
+            -o APT::FTPArchive::Release::Components="main" \
+            -o APT::FTPArchive::Release::Description="ViperOS packages for Debian 13" \
+            release dists/trixie > dists/trixie/Release
+
+          # Signieren. InRelease ist die eingebettete Signatur (clearsigned) -
+          # apt bevorzugt sie; Release.gpg bleibt als Beiwerk fuer aeltere
+          # Werkzeuge.
+          export GNUPGHOME=$(mktemp -d)
+          chmod 700 "$GNUPGHOME"
+          printf '%s' "$SIGNING_KEY" | gpg --batch --quiet --import
+          KEYID=$(gpg --batch --with-colons --list-secret-keys \
+                    | awk -F: '/^fpr:/ {print $10; exit}')
+          echo "Signiere mit $KEYID"
+
+          gpg --batch --yes --default-key "$KEYID" \
+              --clearsign -o dists/trixie/InRelease dists/trixie/Release
+          gpg --batch --yes --default-key "$KEYID" \
+              -abs -o dists/trixie/Release.gpg dists/trixie/Release
+
+          # Signatur gegenpruefen - eine unlesbare Signatur macht das
+          # Repository fuer jedes installierte System unbrauchbar.
+          gpg --batch --verify dists/trixie/InRelease >/dev/null 2>&1 \
+            && echo "InRelease-Signatur gueltig." \
+            || { echo "::error::InRelease-Signatur ist ungueltig"; exit 1; }
+
+          rm -rf "$GNUPGHOME"
+
+          # Der oeffentliche Schluessel liegt zum Herunterladen daneben, damit
+          # sich ViperOS auch auf einem bestehenden Debian einrichten laesst.
+          cp "$GITHUB_WORKSPACE/packages/viperos-settings/usr/share/keyrings/viperos-archive-keyring.gpg" .
+
+      - name: Landing page
+        run: |
+          # Eine Seite mit Einrichtungsanleitung - wer die URL im Browser
+          # aufruft, sieht sonst eine Verzeichnisliste oder einen 404.
+          {
+            echo '<!DOCTYPE html>'
+            echo '<html lang="de"><head><meta charset="utf-8">'
+            echo '<meta name="viewport" content="width=device-width,initial-scale=1">'
+            echo '<title>ViperOS Paketquelle</title>'
+            echo '<style>'
+            echo ':root{color-scheme:dark}'
+            echo 'body{background:#12151f;color:#e7eef9;font:16px/1.6 system-ui,sans-serif;'
+            echo 'max-width:46rem;margin:0 auto;padding:2rem 1rem}'
+            echo 'h1{color:#8fb0e8;font-size:1.6rem}'
+            echo 'code,pre{background:#1b1f2e;border:1px solid #22344f;border-radius:6px}'
+            echo 'code{padding:.1rem .35rem}'
+            echo 'pre{padding:.9rem;overflow-x:auto}'
+            echo 'a{color:#8fb0e8}'
+            echo '</style></head><body>'
+            echo '<h1>ViperOS Paketquelle</h1>'
+            echo '<p>Diese Adresse ist ein APT-Repository. Auf einem installierten'
+            echo 'ViperOS ist es bereits eingetragen; Aktualisierungen kommen mit'
+            echo '<code>apt upgrade</code>.</p>'
+            echo '<h2>Auf einem Debian 13 einrichten</h2>'
+            echo '<pre>sudo curl -fsSLo /usr/share/keyrings/viperos-archive-keyring.gpg \'
+            echo "  ${{ steps.url.outputs.base || 'https://jellystream-app.github.io/viperos-apt' }}/viperos-archive-keyring.gpg"
+            echo ''
+            echo 'sudo tee /etc/apt/sources.list.d/viperos.sources &gt;/dev/null &lt;&lt;EOF'
+            echo 'Types: deb'
+            echo 'URIs: https://jellystream-app.github.io/viperos-apt'
+            echo 'Suites: trixie'
+            echo 'Components: main'
+            echo 'Architectures: amd64'
+            echo 'Signed-By: /usr/share/keyrings/viperos-archive-keyring.gpg'
+            echo 'EOF'
+            echo ''
+            echo 'sudo apt update &amp;&amp; sudo apt install viperos-desktop</pre>'
+            echo '<h2>Inhalt</h2><ul>'
+            for deb in debs/*.deb; do
+              n=$(dpkg-deb -f "$deb" Package); v=$(dpkg-deb -f "$deb" Version)
+              d=$(dpkg-deb -f "$deb" Description | head -1)
+              echo "<li><code>$n</code> $v &mdash; $d</li>"
+            done
+            echo '</ul>'
+            echo "<p><small>Erzeugt aus Commit <code>${GITHUB_SHA::7}</code>.</small></p>"
+            echo '</body></html>'
+          } > repo/index.html
+          echo "Landing page: $(stat -c%s repo/index.html) Bytes"
+
+      - name: Verify repository structure
+        run: |
+          set -euo pipefail
+          bad=0
+          for f in dists/trixie/InRelease dists/trixie/Release \
+                   dists/trixie/main/binary-all/Packages \
+                   dists/trixie/main/binary-amd64/Packages \
+                   viperos-archive-keyring.gpg index.html; do
+            if [ -f "repo/$f" ]; then
+              echo "  OK  $f ($(stat -c%s "repo/$f") Bytes)"
+            else
+              echo "::error::repo/$f fehlt"; bad=1
+            fi
+          done
+          # Der Keyring darf nur den oeffentlichen Teil enthalten.
+          if grep -qa 'PRIVATE KEY BLOCK' repo/viperos-archive-keyring.gpg; then
+            echo "::error::Der veroeffentlichte Keyring enthaelt einen privaten Schluessel"
+            bad=1
+          fi
+          exit "$bad"
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: repo
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Summary
+        run: |
+          {
+            echo "### APT-Repository veroeffentlicht"
+            echo ""
+            echo "${{ steps.deployment.outputs.page_url }}"
+            echo ""
+            echo "| Paket | Version |"
+            echo "|---|---|"
+            for deb in debs/*.deb; do
+              echo "| $(dpkg-deb -f "$deb" Package) | $(dpkg-deb -f "$deb" Version) |"
+            done
+            echo ""
+            echo "Auf einem installierten ViperOS erscheinen diese Pakete beim"
+            echo "naechsten \`apt update\`."
+          } >> "$GITHUB_STEP_SUMMARY"
