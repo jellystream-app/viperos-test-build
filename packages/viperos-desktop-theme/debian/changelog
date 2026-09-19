@@ -1,0 +1,13 @@
+viperos-desktop-theme (2.0.0) trixie; urgency=medium
+
+  * Erste Fassung als eigenes Paket. Das Theme lag bisher teils als Datei in
+    includes.chroot, teils als Logik im Build-Hook 0020 und liess sich nur
+    ueber eine Neuinstallation erneuern.
+  * gnome-shell.css wird jetzt beim Paketbau zusammengesetzt, nicht bei jedem
+    ISO-Bau. debian/rules bricht ab, wenn das Ergebnis unter 150 KB liegt -
+    dann waere GNOMEs Basis-CSS nicht vollstaendig eingebunden und die
+    Oberflaeche fiele im Betrieb auf St-Voreinstellungen zurueck.
+  * index.theme und die GTK3/GTK4-Farbdefinitionen liegen als echte Dateien
+    im Paket statt als Here-Docs im Hook.
+
+ -- ViperOS Project <viperos@radionet.app>  Fri, 19 Sep 2026 12:00:00 +0000

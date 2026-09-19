@@ -1,0 +1,32 @@
+/* ViperOS: libadwaita-Farben an das Shell-Theme angleichen
+ *
+ * GTK4-Anwendungen (Nautilus, Einstellungen, Textfenster) lassen sich nicht
+ * ueber ein Theme umfaerben - libadwaita bringt seine Farben selbst mit.
+ * Ueberschreiben laesst sich das nur ueber @define-color in der Benutzer-CSS,
+ * deshalb liegt diese Datei in /etc/skel und wird fuer jeden neu angelegten
+ * Benutzer uebernommen - auch fuer den, den Calamares bei der Installation
+ * erstellt.
+ */
+@define-color accent_bg_color #6a8fd8;
+@define-color accent_fg_color #0e1119;
+@define-color accent_color #8fb0e8;
+@define-color window_bg_color #12151f;
+@define-color window_fg_color #e7eef9;
+@define-color view_bg_color #1b1f2e;
+@define-color view_fg_color #e7eef9;
+@define-color headerbar_bg_color #1b1f2e;
+@define-color headerbar_fg_color #e7eef9;
+@define-color headerbar_border_color #22344f;
+@define-color sidebar_bg_color #161a27;
+@define-color sidebar_fg_color #e7eef9;
+@define-color sidebar_border_color #22344f;
+@define-color secondary_sidebar_bg_color #12151f;
+@define-color card_bg_color #252b3d;
+@define-color card_fg_color #e7eef9;
+@define-color dialog_bg_color #1b1f2e;
+@define-color dialog_fg_color #e7eef9;
+@define-color popover_bg_color #1f2433;
+@define-color popover_fg_color #e7eef9;
+@define-color thumbnail_bg_color #1b1f2e;
+@define-color shade_color rgba(0, 0, 0, 0.36);
+@define-color scrollbar_outline_color rgba(106, 143, 216, 0.22);

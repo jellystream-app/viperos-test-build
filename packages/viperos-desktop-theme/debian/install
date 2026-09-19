@@ -1,0 +1,6 @@
+usr/share/themes/ViperOS/index.theme              usr/share/themes/ViperOS
+usr/share/themes/ViperOS/gnome-shell              usr/share/themes/ViperOS
+usr/share/backgrounds/viperos                     usr/share/backgrounds
+usr/share/gnome-background-properties/viperos.xml usr/share/gnome-background-properties
+etc/skel/.config/gtk-3.0/gtk.css                  etc/skel/.config/gtk-3.0
+etc/skel/.config/gtk-4.0/gtk.css                  etc/skel/.config/gtk-4.0

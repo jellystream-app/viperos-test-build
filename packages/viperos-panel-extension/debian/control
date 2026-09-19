@@ -1,0 +1,30 @@
+Source: viperos-panel-extension
+Section: gnome
+Priority: optional
+Maintainer: ViperOS Project <viperos@radionet.app>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Homepage: https://radionet.app/
+Rules-Requires-Root: no
+
+Package: viperos-panel-extension
+Architecture: all
+Depends: ${misc:Depends},
+         gnome-shell (>= 48~),
+         gnome-shell (<< 49~)
+Recommends: gnome-shell-extension-desktop-icons-ng
+Description: ViperOS GNOME-Shell-Erweiterung fuer die Arbeitsflaechen-Regionen
+ Berechnet nach dem Laden der Shell die Arbeitsflaechen-Regionen neu, damit
+ Schreibtisch-Symbole unterhalb der oberen Leiste beginnen statt darunter zu
+ verschwinden.
+ .
+ Die Erweiterung aendert bewusst NICHTS am Aussehen der Leiste - kein
+ Floating, keine Inline-Stile. Das gesamte Erscheinungsbild steht im Paket
+ viperos-desktop-theme. Diese Trennung ist Absicht: als beides vermischt war,
+ ueberschrieben sich Inline-Stile und Theme-Regeln gegenseitig, und die
+ Rundungen der Leiste blieben unsichtbar.
+ .
+ Die Versionsgrenzen auf gnome-shell sind streng, weil metadata.json die
+ Shell-Version 48 deklariert. Laedt eine andere Shell die Erweiterung, wird
+ sie als inkompatibel abgewiesen - dann fehlt die Neuberechnung und die
+ Symbole verschwinden wieder hinter der Leiste.

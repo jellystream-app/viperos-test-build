@@ -1,119 +1,72 @@
 #!/bin/bash
-# ViperosOS - GNOME-Shell-Theme zusammensetzen
+# ViperosOS - Theme-Pruefung
 #
-# WICHTIG - das war zuvor falsch:
-# Die user-theme-Extension ruft Main.setThemeStylesheet(pfad) auf. GNOME
-# laedt sein eigenes Stylesheet nur, wenn KEINES gesetzt ist. Ein eigenes
-# Theme ERSETZT also die kompletten 174 KB Standardregeln, es ergaenzt sie
-# nicht. Ein 9-KB-Theme liess dadurch ~165 KB Regeln weg: Topbar, Menues
-# und Uebersicht fielen auf St-Voreinstellungen zurueck - sichtbar als
-# "nur ein Balken ohne Rundung".
+# Hier stand bis V1 die Zusammensetzung des Shell-Themes: gnome-shell.css
+# wurde bei JEDEM ISO-Bau aus GNOMEs Basis-CSS und den ViperOS-Regeln
+# zusammengesetzt, dazu entstanden index.theme und die GTK3/GTK4-Farben als
+# Here-Docs. Auf einem installierten System liess sich davon nichts erneuern.
 #
-# Richtig ist: GNOMEs Standard-CSS als Basis nehmen und die eigenen Regeln
-# ANHAENGEN. Spaetere Regeln gewinnen in CSS, also ueberschreiben unsere
-# genau das, was sie ansprechen - der Rest bleibt vollstaendig erhalten.
-# Ubuntu macht es mit Yaru genauso; deshalb ist auch Yaru ~180 KB gross.
+# Seit V2 liefert das Paket viperos-desktop-theme alles davon:
 #
-# gnome-shell-base.css und viperos-overrides.css kommen ueber
-# includes.chroot ins Image; hier werden sie nur verbunden.
+#   /usr/share/themes/ViperOS/gnome-shell/gnome-shell.css   (fertig gebaut)
+#   /usr/share/themes/ViperOS/index.theme
+#   /usr/share/backgrounds/viperos/*.jpg
+#   /etc/skel/.config/gtk-{3,4}.0/gtk.css
+#
+# Zusammengesetzt wird beim PAKETBAU (packages/viperos-desktop-theme/debian/
+# rules), nicht mehr hier. Das Paket bricht ab, wenn das Ergebnis unter
+# 150 KB liegt.
+#
+# Dieser Hook prueft nur noch, dass das Paket wirklich im Image liegt. Ohne
+# diese Kontrolle wuerde ein vergessenes Paket erst beim Booten auffallen -
+# als Oberflaeche ohne Rundungen, weil GNOME sein Stylesheet nicht laedt,
+# sobald ein eigenes gesetzt ist (Main.setThemeStylesheet).
 
 set -e
 
-echo "[ViperosOS] Setze GNOME-Shell-Theme zusammen..."
+echo "[ViperosOS] Pruefe Theme-Paket..."
 
-THEME=/usr/share/themes/ViperOS/gnome-shell
-BASE="$THEME/gnome-shell-base.css"
-OVER="$THEME/viperos-overrides.css"
-OUT="$THEME/gnome-shell.css"
+CSS=/usr/share/themes/ViperOS/gnome-shell/gnome-shell.css
 
-if [ ! -f "$BASE" ]; then
-    # Rueckfall: Basis aus dem installierten gnome-shell-common ziehen.
-    echo "  gnome-shell-base.css fehlt - extrahiere aus gnome-shell-theme.gresource"
-    G=/usr/share/gnome-shell/gnome-shell-theme.gresource
-    if [ -f "$G" ] && command -v gresource >/dev/null 2>&1; then
-        mkdir -p "$THEME"
-        gresource extract "$G" /org/gnome/shell/theme/gnome-shell-dark.css > "$BASE"
-        for svg in calendar-today.svg calendar-today-light.svg \
-                   gnome-shell-start.svg workspace-placeholder.svg; do
-            gresource extract "$G" "/org/gnome/shell/theme/$svg" > "$THEME/$svg" 2>/dev/null || true
-        done
-    else
-        echo "  WARNUNG: weder Basis-CSS noch gresource verfuegbar"
-    fi
+if [ ! -f "$CSS" ]; then
+    echo "  FEHLER: $CSS fehlt."
+    echo "  Ist viperos-desktop-theme in der Paketliste? Ohne das Theme"
+    echo "  startet die Sitzung mit St-Voreinstellungen statt mit ViperOS."
+    exit 1
 fi
 
-if [ -f "$BASE" ] && [ -f "$OVER" ]; then
-    {
-        cat "$BASE"
-        printf '\n\n/* ==== ViperOS-Ueberschreibungen ab hier ==== */\n\n'
-        cat "$OVER"
-    } > "$OUT"
-    echo "  gnome-shell.css erzeugt: $(stat -c%s "$OUT") Bytes"
-    echo "    davon Basis:        $(stat -c%s "$BASE") Bytes"
-    echo "    davon ViperOS:      $(stat -c%s "$OVER") Bytes"
+size=$(stat -c%s "$CSS")
+echo "  gnome-shell.css: $size Bytes"
+
+# Dieselbe Schwelle wie im Paketbau. Ein zu kleines Theme bedeutet, dass
+# GNOMEs Basis-CSS fehlt - die Shell zeigt dann einen Balken ohne Rundung.
+if [ "$size" -lt 150000 ]; then
+    echo "  FEHLER: Theme ist nur $size Bytes - Basis-CSS fehlt."
+    exit 1
+fi
+
+if [ -f /usr/share/themes/ViperOS/index.theme ]; then
+    echo "  index.theme vorhanden (Theme erscheint in gnome-tweaks)"
 else
-    echo "  WARNUNG: Theme konnte nicht zusammengesetzt werden"
-    [ -f "$BASE" ] || echo "    fehlt: $BASE"
-    [ -f "$OVER" ] || echo "    fehlt: $OVER"
+    echo "  WARNUNG: index.theme fehlt - Theme ist nicht auswaehlbar"
 fi
 
-# index.theme kennzeichnet das Verzeichnis als Theme; ohne sie taucht
-# "ViperOS" in gnome-tweaks nicht in der Auswahl auf.
-cat > /usr/share/themes/ViperOS/index.theme << 'EOF'
-[Desktop Entry]
-Type=X-GNOME-Metatheme
-Name=ViperOS
-Comment=Dunkles ViperOS-Erscheinungsbild
-Encoding=UTF-8
+count=$(find /usr/share/backgrounds/viperos -type f \
+          \( -name '*.jpg' -o -name '*.png' \) 2>/dev/null | wc -l)
+echo "  Hintergrundbilder: $count"
 
-[X-GNOME-Metatheme]
-GtkTheme=Adwaita-dark
-MetacityTheme=Adwaita
-IconTheme=Papirus-Dark
-CursorTheme=Adwaita
-ButtonLayout=close,minimize,maximize:appmenu
-EOF
-
-# ----------------------------------------------------------------------
-# GTK4/libadwaita-Anwendungen (Nautilus, Einstellungen, Textfenster)
-# Deren Farben lassen sich nicht ueber ein Theme tauschen, wohl aber ueber
-# @define-color in der Benutzer-CSS.
-# ----------------------------------------------------------------------
-mkdir -p /etc/skel/.config/gtk-4.0 /etc/skel/.config/gtk-3.0
-cat > /etc/skel/.config/gtk-4.0/gtk.css << 'EOF'
-/* ViperOS: libadwaita-Farben an das Shell-Theme angleichen */
-@define-color accent_bg_color #6a8fd8;
-@define-color accent_fg_color #0e1119;
-@define-color accent_color #8fb0e8;
-@define-color window_bg_color #12151f;
-@define-color window_fg_color #e7eef9;
-@define-color view_bg_color #1b1f2e;
-@define-color view_fg_color #e7eef9;
-@define-color headerbar_bg_color #1b1f2e;
-@define-color headerbar_fg_color #e7eef9;
-@define-color headerbar_border_color #22344f;
-@define-color sidebar_bg_color #161a27;
-@define-color sidebar_fg_color #e7eef9;
-@define-color sidebar_border_color #22344f;
-@define-color secondary_sidebar_bg_color #12151f;
-@define-color card_bg_color #252b3d;
-@define-color card_fg_color #e7eef9;
-@define-color dialog_bg_color #1b1f2e;
-@define-color dialog_fg_color #e7eef9;
-@define-color popover_bg_color #1f2433;
-@define-color popover_fg_color #e7eef9;
-@define-color thumbnail_bg_color #1b1f2e;
-@define-color shade_color rgba(0, 0, 0, 0.36);
-@define-color scrollbar_outline_color rgba(106, 143, 216, 0.22);
-EOF
-cp /etc/skel/.config/gtk-4.0/gtk.css /etc/skel/.config/gtk-3.0/gtk.css
-
-# Fuer den Live-Benutzer, der vor diesem Hook angelegt wurde.
+# Der Live-Benutzer wurde in Hook 0010 angelegt, also VOR der Installation
+# des Theme-Pakets. /etc/skel greift nur bei neu angelegten Konten, deshalb
+# bekommt er die GTK-Farben hier nachtraeglich.
 if id viperos >/dev/null 2>&1; then
-    mkdir -p /home/viperos/.config/gtk-4.0 /home/viperos/.config/gtk-3.0
-    cp /etc/skel/.config/gtk-4.0/gtk.css /home/viperos/.config/gtk-4.0/gtk.css
-    cp /etc/skel/.config/gtk-3.0/gtk.css /home/viperos/.config/gtk-3.0/gtk.css
+    for v in 3.0 4.0; do
+        src="/etc/skel/.config/gtk-$v/gtk.css"
+        [ -f "$src" ] || continue
+        mkdir -p "/home/viperos/.config/gtk-$v"
+        cp "$src" "/home/viperos/.config/gtk-$v/gtk.css"
+    done
     chown -R viperos:viperos /home/viperos/.config 2>/dev/null || true
+    echo "  GTK-Farben fuer den Live-Benutzer uebernommen"
 fi
 
-echo "[ViperosOS] Shell-Theme unter /usr/share/themes/ViperOS bereit."
+echo "[ViperosOS] Theme-Paket in Ordnung."

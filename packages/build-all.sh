@@ -59,7 +59,17 @@ for dir in "$HERE"/*/; do
     for s in postinst prerm postrm preinst; do
         [ -f "$work/debian/$s" ] && chmod 0755 "$work/debian/$s"
     done
-    # Programme im Paket: hier ist das Bit erwuenscht.
+    # Nutzdaten: Verzeichnisse 0755, Dateien 0644. Auch das ist wegen
+    # /mnt/c noetig - sonst landet etwa eine XML-Datei als ausfuehrbar im
+    # Paket, was lintian als "executable-not-elf-or-script" meldet und beim
+    # Nutzer ein sinnloses Ausfuehrbar-Bit hinterlaesst.
+    if [ -d "$work/usr" ] || [ -d "$work/etc" ]; then
+        find "$work" -path "$work/debian" -prune -o -type d -exec chmod 0755 {} +
+        find "$work" -path "$work/debian" -prune -o -type f -exec chmod 0644 {} +
+    fi
+
+    # Programme im Paket: hier ist das Bit erwuenscht, deshalb NACH dem
+    # Zuruecksetzen oben.
     [ -f "$work/usr/bin/viperos-hub" ] && chmod 0755 "$work/usr/bin/viperos-hub"
     [ -f "$work/usr/lib/viperos/update-system" ] && \
         chmod 0755 "$work/usr/lib/viperos/update-system"

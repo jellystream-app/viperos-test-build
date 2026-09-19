@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=ViperOS
+Comment=Dunkles ViperOS-Erscheinungsbild
+Encoding=UTF-8
+
+[X-GNOME-Metatheme]
+GtkTheme=Adwaita-dark
+MetacityTheme=Adwaita
+IconTheme=Papirus-Dark
+CursorTheme=Adwaita
+ButtonLayout=close,minimize,maximize:appmenu

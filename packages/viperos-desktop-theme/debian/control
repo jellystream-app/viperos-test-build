@@ -1,0 +1,31 @@
+Source: viperos-desktop-theme
+Section: x11
+Priority: optional
+Maintainer: ViperOS Project <viperos@radionet.app>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Homepage: https://radionet.app/
+Rules-Requires-Root: no
+
+Package: viperos-desktop-theme
+Architecture: all
+Depends: ${misc:Depends}
+Recommends: gnome-shell-extension-user-theme,
+            gnome-themes-extra,
+            papirus-icon-theme,
+            fonts-inter,
+            fonts-jetbrains-mono
+Description: ViperOS Erscheinungsbild fuer GNOME Shell
+ Das dunkle Erscheinungsbild von ViperOS: Shell-Theme, Hintergrundbilder und
+ die Farbdefinitionen, mit denen GTK3- und GTK4-Anwendungen zum Desktop
+ passen.
+ .
+ Das Shell-Theme entsteht beim Paketbau aus GNOMEs Standard-Stylesheet und den
+ ViperOS-Regeln. Das ist notwendig, weil ein Shell-Theme GNOMEs Stylesheet
+ vollstaendig ersetzt statt es zu ergaenzen: ein Theme, das nur die eigenen
+ Regeln enthaelt, laesst rund 165 KB Standardregeln weg, und die Oberflaeche
+ faellt auf die Voreinstellungen der Zeichenbibliothek zurueck.
+ .
+ Sichtbar wird das Theme ueber die Erweiterung user-theme, die es in
+ gnome-tweaks auswaehlbar macht; die Systemvorgaben im Paket viperos-settings
+ aktivieren es automatisch.

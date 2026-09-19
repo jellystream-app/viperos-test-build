@@ -395,7 +395,11 @@ jobs:
           # tausende Regeln weg und die Oberflaeche faellt auf
           # St-Voreinstellungen zurueck. Deshalb hier pruefen, dass die
           # Basis mitgeliefert wird und gross genug ist.
-          T=build/lb-config/includes.chroot/usr/share/themes/ViperOS/gnome-shell
+          #
+          # Seit V2 liegen die Quellen im Paket viperos-desktop-theme, nicht
+          # mehr in includes.chroot. Zusammengesetzt wird beim Paketbau; die
+          # Schwelle hier ist dieselbe wie in dessen debian/rules.
+          T=packages/viperos-desktop-theme/usr/share/themes/ViperOS/gnome-shell
           base="$T/gnome-shell-base.css"
           over="$T/viperos-overrides.css"
 

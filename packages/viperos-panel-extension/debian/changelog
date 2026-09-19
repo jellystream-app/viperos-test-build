@@ -1,0 +1,12 @@
+viperos-panel-extension (2.0.0) trixie; urgency=medium
+
+  * Erste Fassung als eigenes Paket. Die Erweiterung lag bisher in
+    includes.chroot und kam nur mit einem neuen ISO auf ein System.
+  * metadata.json verwies auf https://viperos.radionet.app/, das nicht
+    aufloest. Jetzt https://radionet.app/.
+  * Abhaengigkeit auf gnome-shell 48 explizit gemacht: metadata.json
+    deklariert shell-version 48, eine andere Shell weist die Erweiterung als
+    inkompatibel ab. Ohne Versionsgrenze wuerde ein Shell-Wechsel die
+    Erweiterung still stilllegen.
+
+ -- ViperOS Project <viperos@radionet.app>  Fri, 19 Sep 2026 12:00:00 +0000

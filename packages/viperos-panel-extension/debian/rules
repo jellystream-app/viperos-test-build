@@ -1,0 +1,12 @@
+#!/usr/bin/make -f
+# ViperOS Panel-Erweiterung - Paketbau
+#
+# Reine Dateien, nichts zu kompilieren. GNOME-Erweiterungen laufen als
+# JavaScript-Module direkt in der Shell.
+
+%:
+	dh $@
+
+# Die Erweiterung braucht eine laufende Shell; hier gibt es nichts zu testen.
+# Die Syntaxpruefung der JS-Datei uebernimmt der CI-Preflight.
+override_dh_auto_test:

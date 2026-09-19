@@ -1,0 +1,52 @@
+#!/usr/bin/make -f
+# ViperOS Desktop-Theme - Paketbau
+#
+# Kernaufgabe: gnome-shell.css aus GNOMEs Basis-CSS und den ViperOS-Regeln
+# zusammensetzen. Das lief bis V1 im Build-Hook 0020 bei jedem ISO-Bau; jetzt
+# passiert es einmal pro Paketversion, und das .deb enthaelt das Ergebnis.
+#
+# WARUM ANHAENGEN UND NICHT ERSETZEN:
+# Die user-theme-Extension ruft Main.setThemeStylesheet(pfad) auf. GNOME laedt
+# sein eigenes Stylesheet nur, wenn KEINES gesetzt ist. Ein eigenes Theme
+# ERSETZT also die kompletten ~175 KB Standardregeln, es ergaenzt sie nicht.
+# Ein 10-KB-Theme liess dadurch ~165 KB Regeln weg: Topbar, Menues und
+# Uebersicht fielen auf St-Voreinstellungen zurueck - sichtbar als "nur ein
+# Balken ohne Rundung".
+#
+# Richtig ist: GNOMEs Standard-CSS als Basis nehmen und die eigenen Regeln
+# ANHAENGEN. Spaetere Regeln gewinnen in CSS, also ueberschreiben unsere genau
+# das, was sie ansprechen - der Rest bleibt vollstaendig erhalten. Ubuntu macht
+# es mit Yaru genauso; deshalb ist auch Yaru ~180 KB gross.
+
+THEME := usr/share/themes/ViperOS/gnome-shell
+BASE  := $(THEME)/gnome-shell-base.css
+OVER  := $(THEME)/viperos-overrides.css
+OUT   := $(THEME)/gnome-shell.css
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	@echo "Setze gnome-shell.css zusammen..."
+	@test -f $(BASE) || { echo "FEHLER: $(BASE) fehlt"; exit 1; }
+	@test -f $(OVER) || { echo "FEHLER: $(OVER) fehlt"; exit 1; }
+	@{ \
+	  cat $(BASE); \
+	  printf '\n\n/* ==== ViperOS-Ueberschreibungen ab hier ==== */\n\n'; \
+	  cat $(OVER); \
+	} > $(OUT)
+	@echo "  Basis:   $$(stat -c%s $(BASE)) Bytes"
+	@echo "  ViperOS: $$(stat -c%s $(OVER)) Bytes"
+	@echo "  Ergebnis: $$(stat -c%s $(OUT)) Bytes"
+	# Sicherheitsnetz: liegt das Ergebnis unter 150 KB, wurde die Basis nicht
+	# vollstaendig eingebunden und die Oberflaeche wuerde im Betrieb auf
+	# St-Voreinstellungen zurueckfallen. Lieber hier scheitern als im ISO.
+	@test $$(stat -c%s $(OUT)) -gt 150000 || { \
+	  echo "FEHLER: gnome-shell.css ist nur $$(stat -c%s $(OUT)) Bytes - Basis unvollstaendig"; \
+	  exit 1; }
+
+override_dh_auto_clean:
+	rm -f $(OUT)
+
+# Nichts zu testen: das Ergebnis ist eine CSS-Datei, geprueft wird oben.
+override_dh_auto_test:
