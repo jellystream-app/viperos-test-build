@@ -24,6 +24,24 @@ build/lb-config/auto/config  text eol=lf
 build/lb-config/auto/build   text eol=lf
 build/lb-config/auto/clean   text eol=lf
 
+# Debian packaging (packages/): none of these have an extension, so they would
+# otherwise rely on the text=auto heuristic above. Being explicit matters here:
+# a CR in debian/control corrupts the package name, and in debian/rules make
+# aborts with "missing separator". dpkg-buildpackage gives no useful hint.
+packages/*/debian/control        text eol=lf
+packages/*/debian/changelog      text eol=lf
+packages/*/debian/rules          text eol=lf
+packages/*/debian/install        text eol=lf
+packages/*/debian/copyright      text eol=lf
+packages/*/debian/compat         text eol=lf
+packages/*/debian/source/format  text eol=lf
+packages/*/debian/post*          text eol=lf
+packages/*/debian/pre*           text eol=lf
+packages/*/debian/*.install      text eol=lf
+# Programs shipped inside the packages (also extension-less)
+packages/*/usr/bin/*             text eol=lf
+packages/*/usr/lib/viperos/*     text eol=lf
+
 # Config files shipped into the image
 *.conf          text eol=lf
 *.desc          text eol=lf

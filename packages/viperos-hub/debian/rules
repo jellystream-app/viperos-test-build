@@ -1,0 +1,18 @@
+#!/usr/bin/make -f
+# ViperOS Hub - Paketbau
+#
+# Das Paket besteht aus fertigen Dateien; es gibt nichts zu kompilieren.
+# debhelper uebernimmt den gesamten Ablauf, dh_install verteilt die Dateien
+# anhand von debian/install.
+
+%:
+	dh $@
+
+# Keine automatischen Tests: der Hub ist eine GTK-Anwendung und braucht eine
+# Sitzung. Die Syntaxpruefung laeuft stattdessen im CI-Preflight.
+override_dh_auto_test:
+
+# dh_python3 wuerde das Skript als Modul behandeln wollen. Der Hub ist ein
+# ausfuehrbares Programm in /usr/bin ohne importierbaren Anteil, daher
+# uebersprungen - die Abhaengigkeiten stehen von Hand in debian/control.
+override_dh_python3:

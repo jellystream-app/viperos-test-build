@@ -1,0 +1,36 @@
+Source: viperos-hub
+Section: admin
+Priority: optional
+Maintainer: ViperOS Project <viperos@radionet.app>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Homepage: https://radionet.app/
+Rules-Requires-Root: no
+
+Package: viperos-hub
+Architecture: all
+Depends: ${misc:Depends},
+         python3,
+         python3-gi,
+         gir1.2-gtk-3.0,
+         pciutils,
+         procps,
+         pkexec
+Recommends: gnome-terminal,
+            gnome-control-center,
+            gnome-system-monitor,
+            nautilus,
+            gnome-disk-utility
+Description: ViperOS Systemzentrale
+ Der ViperOS Hub zeigt den Zustand des laufenden Systems und buendelt die
+ Aufgaben, die nach dem ersten Start anfallen.
+ .
+ Enthalten sind eine Uebersicht mit Live-Kacheln fuer Arbeitsspeicher,
+ Datentraeger und Netzwerk, eine Geraeteliste, Verknuepfungen zu den
+ Systemwerkzeugen sowie die Systemaktualisierung. Laeuft ViperOS vom
+ Live-Medium, bietet der Hub zusaetzlich die Installation auf die Festplatte
+ an.
+ .
+ Die Werkzeuge in Recommends werden nur aufgerufen, wenn der Nutzer den
+ jeweiligen Knopf betaetigt; fehlt eines, sagt der Hub das statt still zu
+ scheitern. Deshalb stehen sie nicht in Depends.

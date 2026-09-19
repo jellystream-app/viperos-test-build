@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=ViperOS Hub
+GenericName=System Center
+GenericName[de]=Systemzentrale
+Comment=System, software and setup
+Comment[de]=System, Software und Einrichtung
+Exec=viperos-hub
+Icon=viperos
+Terminal=false
+StartupNotify=true
+Categories=Settings;System;
+Keywords=system;info;update;install;viperos;
+Keywords[de]=System;Info;Aktualisierung;Installation;viperos;

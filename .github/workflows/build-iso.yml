@@ -70,9 +70,13 @@ jobs:
               echo "::error file=$f::CRLF-Zeilenenden - muessen LF sein"
               bad=1
             fi
-          done < <(find build/lb-config -type f \
+          done < <(find build/lb-config packages -type f \
                      \( -name '*.hook.chroot' -o -name '*.list.chroot' \
-                        -o -name 'config' -o -name 'build' -o -name 'clean' \))
+                        -o -name 'config' -o -name 'build' -o -name 'clean' \
+                        -o -name 'control' -o -name 'changelog' -o -name 'rules' \
+                        -o -name 'install' -o -name 'format' -o -name '*.sh' \
+                        -o -path '*/usr/bin/*' -o -path '*/usr/lib/viperos/*' \) \
+                     2>/dev/null)
           [ "$bad" -eq 0 ] && echo "Alle Dateien haben LF-Zeilenenden."
           exit "$bad"
 
@@ -92,6 +96,119 @@ jobs:
               echo "  OK  $h"
             fi
           done
+          exit "$bad"
+
+      - name: Validate ViperOS packages
+        run: |
+          # Seit V2 liegt die ViperOS-Identitaet in packages/ als echte
+          # Debian-Pakete. Diese Pruefungen brauchen keinen Paketbau und
+          # fangen die Fehler ab, die sonst erst im Container auffallen.
+          bad=0
+
+          for pkg in packages/*/; do
+            [ -d "$pkg/debian" ] || continue
+            name=$(basename "$pkg")
+            echo "--- $name"
+
+            # Pflichtdateien. Fehlt eine, scheitert dpkg-buildpackage mit
+            # einer Meldung, die nicht auf die Ursache zeigt.
+            for f in debian/control debian/changelog debian/rules; do
+              [ -f "$pkg$f" ] || { echo "::error::$name: $f fehlt"; bad=1; }
+            done
+
+            # debian/rules MUSS ausfuehrbar sein, alle anderen debian/-Dateien
+            # duerfen es NICHT: debhelper fuehrt eine ausfuehrbare Config als
+            # Programm aus, statt sie zu lesen. Bei debian/install endete der
+            # Bau dadurch mit "exit code 127".
+            #
+            # Geprueft wird der Modus im GIT-INDEX, nicht im Dateisystem. Auf
+            # einem Windows-Arbeitsplatz meldet der Treiber fuer jede Datei
+            # 0755, eine Dateisystem-Pruefung wuerde dort also alles
+            # anschlagen. Git speichert nur 100644 oder 100755 - das ist der
+            # Wert, den auch der Runner auscheckt.
+            # Ohne Index-Ausgabe waere die Pruefung wirkungslos und wuerde
+            # still durchwinken - also erst pruefen, ob git ueberhaupt liefert.
+            if ! git ls-files -s "$pkg/debian" | grep -q .; then
+              echo "::error::$name: git ls-files liefert nichts fuer $pkg/debian"
+              echo "  Sind die Dateien committet? Ohne Index keine Rechte-Pruefung."
+              bad=1
+            fi
+            while IFS= read -r line; do
+              mode=${line%% *}
+              f=${line#*$'\t'}
+              case "$(basename "$f")" in
+                rules)
+                  [ "$mode" = "100755" ] || {
+                    echo "::error::$f ist im Git-Index nicht ausfuehrbar (Modus $mode)"
+                    echo "  Beheben mit: git update-index --chmod=+x $f"
+                    bad=1; }
+                  continue ;;
+                postinst|preinst|postrm|prerm)
+                  [ "$mode" = "100755" ] || {
+                    echo "::error::$f (Maintainer-Skript) muss ausfuehrbar sein"
+                    bad=1; }
+                  continue ;;
+              esac
+              if [ "$mode" = "100755" ]; then
+                echo "::error::$f ist ausfuehrbar - debhelper wuerde es ausfuehren statt lesen"
+                echo "  Beheben mit: git update-index --chmod=-x $f"
+                bad=1
+              fi
+            done < <(git ls-files -s "$pkg/debian")
+
+            # Version in changelog und Paketname in control muessen passen.
+            cname=$(sed -n 's/^Package: *//p' "$pkg/debian/control" | head -1)
+            lname=$(sed -n '1s/^\([^ ]*\).*/\1/p' "$pkg/debian/changelog")
+            if [ "$cname" != "$lname" ]; then
+              echo "::error::$name: control nennt '$cname', changelog '$lname'"
+              bad=1
+            else
+              ver=$(sed -n '1s/.*(\([^)]*\)).*/\1/p' "$pkg/debian/changelog")
+              echo "      $cname $ver"
+            fi
+          done
+
+          # Python-Syntax der mitgelieferten Programme. Der Hub war bis V1 ein
+          # Here-Doc im Hook und liess sich nur durch einen ISO-Bau pruefen.
+          while IFS= read -r f; do
+            if head -1 "$f" | grep -q 'python3'; then
+              if python3 -c "import ast,sys; ast.parse(open(sys.argv[1],encoding='utf-8').read())" "$f"; then
+                echo "  OK  $f (Python)"
+              else
+                echo "::error file=$f::Python-Syntaxfehler"; bad=1
+              fi
+            elif head -1 "$f" | grep -qE '^#!/bin/(ba)?sh'; then
+              out=$(bash -n "$f" 2>&1) && [ -z "$out" ] \
+                && echo "  OK  $f (Shell)" \
+                || { echo "::error file=$f::$out"; bad=1; }
+            fi
+          done < <(find packages -type f \( -path '*/usr/bin/*' \
+                     -o -path '*/usr/lib/viperos/*' -o -name '*.sh' \) 2>/dev/null)
+
+          # Der Hub darf keine XFCE-Werkzeuge mehr AUFRUFEN: ViperOS 2.0 laeuft
+          # auf GNOME Shell, keines dieser Programme ist installiert. Geprueft
+          # werden nur die Programmdateien, nicht debian/ - im Changelog stehen
+          # die Namen zu Recht, dort ist dokumentiert, dass sie entfernt wurden.
+          if find packages -type f \( -path '*/usr/bin/*' \
+               -o -path '*/usr/lib/viperos/*' \) -print0 2>/dev/null \
+             | xargs -0 -r grep -n 'xfce4-\|xfce-polkit'; then
+            echo "::error::XFCE-Aufrufe in einem Paketprogramm - unter GNOME 48 nicht vorhanden"
+            bad=1
+          fi
+
+          # /usr/local ist laut Debian Policy dem lokalen Administrator
+          # vorbehalten; Paketdateien dort sind ein Policy-Verstoss.
+          #
+          # Das Muster hat KEINEN fuehrenden Slash: in debian/install stehen
+          # Zielpfade immer relativ zum Wurzelverzeichnis ("usr/local/bin",
+          # nicht "/usr/local/bin"). Ein Muster mit Slash traf deshalb nie zu -
+          # der Check war wirkungslos, bis ein Negativtest es gezeigt hat.
+          if grep -rnE '(^|[[:space:]])/?usr/local' packages/*/debian/install 2>/dev/null; then
+            echo "::error::Paket installiert nach /usr/local - Policy-Verstoss"
+            echo "  Paketdateien gehoeren nach /usr; /usr/local ist dem Administrator vorbehalten."
+            bad=1
+          fi
+
           exit "$bad"
 
       - name: Validate package list against Debian Trixie

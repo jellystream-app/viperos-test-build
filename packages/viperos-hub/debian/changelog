@@ -1,0 +1,17 @@
+viperos-hub (2.0.0) trixie; urgency=medium
+
+  * Erste Fassung als eigenes Paket. Bisher wurde der Hub als Here-Doc aus
+    dem Build-Hook 0015 in das ISO geschrieben und war damit nur ueber eine
+    Neuinstallation zu erneuern. Als Paket kommt er ueber das ViperOS-Repo
+    und laesst sich mit "apt upgrade" aktualisieren.
+  * XFCE-Rueckfallebenen entfernt (xfce4-terminal, xfce4-taskmanager,
+    xfce4-settings-manager, xfce-polkit). Sie stammten aus der Zeit vor dem
+    Wechsel auf GNOME Shell und sind in ViperOS 2.0 nicht installiert, die
+    Abfragen liefen also immer ins Leere.
+  * update-system liegt nach Debian Policy unter /usr/lib/viperos/ statt
+    unter /usr/local/lib/; /usr/local ist dem lokalen Administrator
+    vorbehalten und darf keine Paketdateien enthalten.
+  * main() nur noch unter __name__ == "__main__" aufrufen, damit Werkzeuge
+    die Datei einlesen koennen, ohne ein Fenster zu oeffnen.
+
+ -- ViperOS Project <viperos@radionet.app>  Fri, 19 Sep 2026 12:00:00 +0000

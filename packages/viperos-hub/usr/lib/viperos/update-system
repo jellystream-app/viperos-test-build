@@ -1,0 +1,26 @@
+#!/bin/sh
+# ViperOS - Systemaktualisierung
+#
+# Wird vom Hub ueber "pkexec /usr/lib/viperos/update-system" gestartet.
+# pkexec fuehrt das Skript als root aus und fragt vorher nach dem Passwort;
+# eine eigene polkit-Policy gibt es bewusst nicht, damit die Aktualisierung
+# nicht ohne Rueckfrage laufen kann.
+#
+# Seit V2 liefert ViperOS seine eigenen Pakete aus einem signierten Repo.
+# "apt upgrade" holt damit nicht nur Debian-Sicherheitsupdates, sondern auch
+# neue Fassungen von Hub, Theme und Systemvorgaben.
+set -eu
+
+# Nicht-interaktiv: das Skript laeuft im Terminalfenster des Hubs, dort kann
+# niemand auf Rueckfragen von dpkg antworten.
+export DEBIAN_FRONTEND=noninteractive
+
+echo "Paketlisten werden gelesen..."
+apt-get update
+
+echo
+echo "Aktualisierungen werden installiert..."
+apt-get upgrade -y
+
+echo
+echo "Fertig. Ein Neustart ist nur nach Kernel-Aktualisierungen noetig."
