@@ -423,7 +423,7 @@ class Hub(Gtk.Window):
         actions.add(self.action_button(
             "Netzwerk verwalten", "WLAN, VPN und Verbindungen.", self.on_network))
         actions.add(self.action_button(
-            "Dateien öffnen", "Persönlicher Ordner in Thunar.", self.on_files))
+            "Dateien öffnen", "Persönlicher Ordner in Dateien.", self.on_files))
         page.pack_start(actions, False, False, 0)
         return scroller
 
@@ -471,9 +471,13 @@ class Hub(Gtk.Window):
         head = Gtk.Label(label="Vorinstalliert", xalign=0)
         head.get_style_context().add_class("h2")
         card.pack_start(head, False, False, 0)
-        preinstalled = ("Firefox ESR", "VS Code", "Discord", "Jellystream",
+        # Nur was wirklich im Image liegt. Discord stand hier, wird seit 2.0
+        # aber nicht mehr vorinstalliert (die Flatpak-Runtime kostete 1-2 GB);
+        # "Thunar" war schon vorher falsch - das ist XFCEs Dateimanager, unter
+        # GNOME ist es Nautilus, und XFCE hat ViperOS vor 2.0 verlassen.
+        preinstalled = ("Firefox ESR", "VS Code", "Jellystream",
                         "LibreOffice", "GIMP", "Inkscape", "Audacity",
-                        "OBS Studio", "VLC", "KeePassXC", "Thunar")
+                        "OBS Studio", "VLC", "KeePassXC", "Dateien")
         flow = Gtk.FlowBox()
         flow.set_selection_mode(Gtk.SelectionMode.NONE)
         flow.set_max_children_per_line(4)
@@ -495,6 +499,10 @@ class Hub(Gtk.Window):
         actions.add(self.action_button(
             "Updates einspielen", "Paketquellen aktualisieren und upgraden.",
             self.on_update, primary=True))
+        actions.add(self.action_button(
+            "Discord installieren",
+            "Aus Flathub nachladen - nicht vorinstalliert.",
+            self.on_discord))
         actions.add(self.action_button(
             "Flatpak-Anwendungen", "Installierte Flatpaks anzeigen.", self.on_flatpak))
         actions.add(self.action_button(
@@ -690,6 +698,24 @@ class Hub(Gtk.Window):
                                     ["gnome-control-center"])
     def on_flatpak(self, _b):   self.term("flatpak list")
     def on_apt(self, _b):       self.term("apt list --upgradable")
+
+    def on_discord(self, _b):
+        """Discord aus Flathub nachinstallieren.
+
+        Bis ViperOS 2.0 lag Discord im Image. Das kostete 1 bis 2 GB, weil
+        Flatpak fuer die erste Anwendung die komplette Freedesktop-Runtime
+        mitbringt - und traf jeden, auch wer Discord nie startet. Die
+        Flathub-Quelle ist eingetragen, das Nachladen dauert wenige Minuten.
+
+        Laeuft ohne pkexec: "flatpak install --user" braucht keine
+        Administratorrechte, und in einer Live-Sitzung waere eine
+        systemweite Installation ohnehin beim Neustart verloren.
+        """
+        if shutil.which("flatpak") is None:
+            self.problem("Flatpak nicht verfuegbar",
+                         "Das Paket flatpak ist nicht installiert.")
+            return
+        self.term("flatpak install --user -y flathub com.discordapp.Discord")
 
 
 def main():

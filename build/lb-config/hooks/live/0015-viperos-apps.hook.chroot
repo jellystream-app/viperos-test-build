@@ -2,9 +2,9 @@
 # ViperosOS - Anwendungen aus externen Quellen
 #
 # Dieser Hook installiert nur, was NICHT aus Debian oder dem ViperOS-Repo
-# kommt: VS Code (Microsofts APT-Quelle), Jellystream (GitHub-Release mit
-# gepinnter Pruefsumme) und Discord (Flathub). Alles Eigene liegt seit V2 in
-# packages/ und kommt ueber das Metapaket viperos-desktop.
+# kommt: VS Code (Microsofts APT-Quelle) und Jellystream (GitHub-Release mit
+# gepinnter Pruefsumme). Alles Eigene liegt seit V2 in packages/ und kommt
+# ueber das Metapaket viperos-desktop.
 set -e
 
 # /usr/local/lib/viperos wird hier nicht mehr angelegt: update-system liegt
@@ -24,8 +24,27 @@ openssl dgst -sha512 -binary "/tmp/viperos-apps/${JELLYSTREAM_DEB}" > /tmp/viper
 cmp /tmp/viperos-apps/jellystream.expected /tmp/viperos-apps/jellystream.actual
 apt-get install -y "/tmp/viperos-apps/${JELLYSTREAM_DEB}"
 
+# ----------------------------------------------------------------------
+# Flathub eintragen - aber NICHTS daraus vorinstallieren
+#
+# Hier wurde bis V2.0 Discord als Flatpak installiert. Das war der groesste
+# Einzelposten des Images: Flatpak bringt fuer die erste Anwendung die
+# komplette Freedesktop-Runtime mit, rund 1 bis 2 GB - mehr als alle
+# LibreOffice-, Firmware- und Schriftpakete zusammen (290 + 363 + 112 MB).
+#
+# Folgen, die das hatte:
+#   - die ISO lag bei ~3,5 GB und sprengte damit das 2-GiB-Limit fuer
+#     GitHub-Release-Assets; sie liess sich nur als Artefakt ablegen, das
+#     nach fuenf Tagen verfaellt
+#   - jeder Nutzer lud Discord mit herunter, auch wer es nie startet
+#
+# Deshalb bleibt nur die Quelle eingetragen: Discord und alles andere aus
+# Flathub ist damit einen Klick entfernt (Softwareverwaltung oder
+# "flatpak install flathub com.discordapp.Discord"), liegt aber nicht im
+# Image. So macht es auch Fedora mit seinen Flatpak-Quellen.
+# ----------------------------------------------------------------------
 flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-flatpak install --system -y --noninteractive flathub com.discordapp.Discord
+
 rm -rf /tmp/viperos-apps
 
 # ----------------------------------------------------------------------

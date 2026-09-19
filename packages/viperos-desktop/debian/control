@@ -10,7 +10,7 @@ Rules-Requires-Root: no
 Package: viperos-desktop
 Architecture: all
 Depends: ${misc:Depends},
-         viperos-settings (= 2.0.0),
+         viperos-settings (>= 2.0.0),
          viperos-desktop-theme,
          viperos-panel-extension,
          viperos-hub

@@ -146,12 +146,18 @@ Only if all of that passes does the **build** stage run `lb build` inside a
 ## Contents
 
 GNOME Shell 48, Firefox ESR, LibreOffice, GIMP, Inkscape, Audacity, OBS
-Studio, VS Code, Discord, Jellystream, KeePassXC, Remmina, FileZilla, and the
-Calamares installer.
+Studio, VS Code, Jellystream, KeePassXC, Remmina, FileZilla, and the Calamares
+installer.
 
-VS Code comes from Microsoft's signed APT repository, Discord from Flathub,
-and Jellystream is pinned to its official GitHub release and SHA-512 checksum
-for reproducible builds. Audio runs on PipeWire, which is the default stack in
+VS Code comes from Microsoft's signed APT repository, and Jellystream is pinned
+to its official GitHub release and SHA-512 checksum for reproducible builds.
+
+Flathub is registered but nothing is preinstalled from it. Discord used to ship
+in the image and was the single largest thing in it: Flatpak pulls the whole
+Freedesktop runtime for the first application, 1-2 GB, more than LibreOffice,
+firmware and fonts combined. That pushed the ISO to ~3.5 GB, over the 2 GiB
+limit for GitHub release assets, and every user downloaded Discord whether they
+wanted it or not. The Hub has a button to install it on demand. Audio runs on PipeWire, which is the default stack in
 Trixie. The ISO includes `shim-signed`, so it boots on machines with Secure
 Boot enabled.
 

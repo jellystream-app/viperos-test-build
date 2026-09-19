@@ -196,6 +196,37 @@ jobs:
             bad=1
           fi
 
+          # Auch NAMEN entfernter Programme in sichtbarem Text pruefen, nicht
+          # nur Aufrufe. Der Hub warb in einer Knopfbeschriftung noch fuer
+          # "Thunar" und fuehrte Discord als vorinstalliert - beides seit 2.0
+          # nicht mehr im Image. Solche Texte liest der Nutzer; ein
+          # Aufruf-Check sieht sie nicht.
+          #
+          # Gesucht wird nur in Zeilen, deren Text tatsaechlich in der
+          # Oberflaeche landet: Knopfbeschriftungen (action_button),
+          # Label/Markup und die Liste der vorinstallierten Programme. Ein
+          # Check ueber die ganze Datei schlug auf Docstrings an, die zu Recht
+          # erklaeren, WARUM XFCE entfernt wurde - und ein Check, der bei
+          # korrektem Code meckert, wird ignoriert.
+          # "Discord installieren" ist ausgenommen: das ist der Knopf, der es
+          # aus Flathub NACHLAEDT - ein Angebot, keine falsche Behauptung. Nur
+          # Texte, die ein entferntes Programm als vorhanden darstellen, sind
+          # der Fehler.
+          while IFS= read -r f; do
+            hits=$(grep -nE 'action_button\(|Gtk\.Label|set_markup|preinstalled *=' -A2 "$f" \
+                   | grep -iE 'thunar|xfce|discord' \
+                   | grep -viE 'installieren|install ' || true)
+            if [ -n "$hits" ]; then
+              echo "::error file=$f::nennt entfernte Programme als vorhanden:"
+              printf '%s\n' "$hits" | sed 's/^/    /'
+              echo "  Discord und XFCE-Werkzeuge liegen seit 2.0 nicht im Image."
+              echo "  Zum Nachinstallieren anbieten ist in Ordnung; als"
+              echo "  vorinstalliert auffuehren nicht."
+              bad=1
+            fi
+          done < <(find packages -type f \( -path '*/usr/bin/*' \
+                     -o -path '*/usr/lib/viperos/*' \) 2>/dev/null)
+
           # Die APT-Quelle im deb822-Format pruefen. Ein Formatfehler ist hier
           # besonders heimtueckisch: apt meldet "Malformed stanza" und
           # ignoriert die Datei, das System bekommt stillschweigend keine
@@ -672,8 +703,22 @@ jobs:
                 echo "--- Zeilen, die nach der Ursache aussehen ---"
                 # Chroot-Fehler und apt-Meldungen stehen oft weit oben im Log,
                 # nicht am Ende - das Ende zeigt nur, wo live-build aufgab.
-                grep -nE '^E:|^Err:|error:|FEHLER|Unable to locate|No such file|Permission denied|Hook.*failed|dpkg: error' \
-                  /output/build.log | tail -40 || echo "(keine passende Zeile gefunden)"
+                #
+                # Die Muster stehen ZEILENWEISE in einer Datei und werden mit
+                # "grep -F -f" gelesen. Der Grund: dieser Block laeuft in einem
+                # "docker run bash -c" mit einfachen Anfuehrungszeichen. Jedes
+                # Anfuehrungszeichen und jede Alternation im Muster ist dort ein
+                # Risiko - ein erster Versuch mit einem regulaeren Ausdruck
+                # sprengte das Zitat, die Shell las die Musterteile als
+                # Kommandos ("^Err:: command not found") und der Job endete mit
+                # Exit 127, bevor der Build ueberhaupt begann. Feste
+                # Zeichenketten in einer Datei koennen das nicht.
+                printf "%s\n" E: Err: error: FEHLER \
+                  "Unable to locate" "No such file" "Permission denied" \
+                  "dpkg: error" "is not installable" \
+                  > /tmp/errpat.txt
+                grep -F -n -f /tmp/errpat.txt /output/build.log | tail -40 \
+                  || echo "(keine passende Zeile gefunden)"
                 exit "$rc"
               fi
 

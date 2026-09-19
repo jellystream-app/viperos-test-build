@@ -1,3 +1,14 @@
+viperos-desktop (2.0.1) trixie; urgency=medium
+
+  * viperos-settings nicht mehr auf die exakte Version festnageln, sondern
+    ">= 2.0.0". Mit "=" haette jedes Settings-Update das Metapaket gebrochen:
+    apt haette die neue Fassung zurueckgehalten, weil viperos-desktop auf
+    genau 2.0.0 bestand - also genau die Aktualisierbarkeit verhindert, um die
+    es in V2 geht. Die Absicht war, eine fremde Fassung mit abweichender
+    Paketquelle auszuschliessen; dafuer genuegt die Untergrenze.
+
+ -- ViperOS Project <viperos@radionet.app>  Fri, 19 Sep 2026 20:30:00 +0000
+
 viperos-desktop (2.0.0) trixie; urgency=medium
 
   * Erste Fassung. Buendelt die vier ViperOS-Pakete, damit die Paketliste des
