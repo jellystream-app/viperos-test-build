@@ -126,9 +126,16 @@ jobs:
           if-no-files-found: error
 
   # ---------------------------------------------------------------------------
-  # Stufe 2: Repository bauen und auf Pages veroeffentlichen. Nur auf main -
-  # ein Pull Request soll die Quelle, aus der alle Systeme aktualisieren,
-  # nicht veraendern koennen.
+  # Stufe 2: Repository bauen und veroeffentlichen. Nur auf main - ein Pull
+  # Request soll die Quelle, aus der alle Systeme aktualisieren, nicht
+  # veraendern koennen.
+  #
+  # Ziel ist ein ANDERES Repository: jellystream-app/viperos-apt. Deshalb
+  # laeuft die Veroeffentlichung als git push, nicht ueber
+  # actions/deploy-pages - diese Action kann nur Pages des Repositories
+  # bedienen, in dem sie laeuft. Der Code bleibt hier, die Auslieferung liegt
+  # getrennt davon; das verhindert auch, dass ein ISO-Commit versehentlich die
+  # Paketquelle anfasst.
   # ---------------------------------------------------------------------------
   publish:
     needs: build
@@ -137,11 +144,10 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      TARGET_REPO: jellystream-app/viperos-apt
+      TARGET_BRANCH: gh-pages
+      PUBLIC_URL: https://jellystream-app.github.io/viperos-apt
     steps:
       - uses: actions/checkout@v4
 
@@ -150,20 +156,33 @@ jobs:
           name: viperos-debs
           path: debs
 
-      - name: Check for signing key
+      - name: Check secrets
         run: |
+          missing=0
           if [ -z "${{ secrets.APT_SIGNING_KEY }}" ]; then
             echo "::error::Das Secret APT_SIGNING_KEY fehlt."
+            echo "  Ohne Signatur verweigert apt die Quelle, das Repository"
+            echo "  waere also nutzlos."
+            echo "  Inhalt: der private Schluessel, ASCII-armored"
+            echo "  (live-test/make-signing-key.sh erzeugt das Paar)"
+            missing=1
+          fi
+          if [ -z "${{ secrets.APT_DEPLOY_TOKEN }}" ]; then
+            echo "::error::Das Secret APT_DEPLOY_TOKEN fehlt."
+            echo "  Gebraucht wird ein Personal Access Token mit Schreibrecht"
+            echo "  auf $TARGET_REPO - der GITHUB_TOKEN dieses Laufs gilt nur"
+            echo "  fuer das eigene Repository."
+            echo "  Fine-grained Token: Repository access -> viperos-apt,"
+            echo "  Permissions -> Contents: Read and write."
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then
             echo ""
-            echo "Ohne Signatur verweigert apt die Quelle, das Repository waere"
-            echo "also nutzlos. Einrichten:"
-            echo "  1. bash live-test/make-signing-key.sh  (erzeugt das Paar)"
-            echo "  2. Settings -> Secrets and variables -> Actions"
-            echo "  3. New repository secret: APT_SIGNING_KEY"
-            echo "     Inhalt: /tmp/viperos-keys/private-key.asc"
+            echo "Beide unter Settings -> Secrets and variables -> Actions"
+            echo "dieses Repositories eintragen."
             exit 1
           fi
-          echo "APT_SIGNING_KEY vorhanden."
+          echo "Beide Secrets vorhanden."
 
       - name: Build signed APT repository
         env:
@@ -271,11 +290,11 @@ jobs:
             echo '<code>apt upgrade</code>.</p>'
             echo '<h2>Auf einem Debian 13 einrichten</h2>'
             echo '<pre>sudo curl -fsSLo /usr/share/keyrings/viperos-archive-keyring.gpg \'
-            echo "  ${{ steps.url.outputs.base || 'https://jellystream-app.github.io/viperos-apt' }}/viperos-archive-keyring.gpg"
+            echo "  ${PUBLIC_URL}/viperos-archive-keyring.gpg"
             echo ''
             echo 'sudo tee /etc/apt/sources.list.d/viperos.sources &gt;/dev/null &lt;&lt;EOF'
             echo 'Types: deb'
-            echo 'URIs: https://jellystream-app.github.io/viperos-apt'
+            echo "URIs: ${PUBLIC_URL}"
             echo 'Suites: trixie'
             echo 'Components: main'
             echo 'Architectures: amd64'
@@ -316,19 +335,97 @@ jobs:
           fi
           exit "$bad"
 
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: repo
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Push repository to viperos-apt
+        env:
+          DEPLOY_TOKEN: ${{ secrets.APT_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # .nojekyll ist entscheidend: ohne diese Datei laesst GitHub Pages
+          # den Inhalt durch Jekyll laufen, und Jekyll IGNORIERT Verzeichnisse,
+          # die mit einem Unterstrich beginnen, sowie manche Dateitypen. Das
+          # APT-Repository muss unveraendert ausgeliefert werden, sonst
+          # stimmen die Pruefsummen in der Release-Datei nicht mehr.
+          touch repo/.nojekyll
+
+          cd repo
+          git init -q -b "$TARGET_BRANCH"
+          git config user.name "ViperOS CI"
+          git config user.email "viperos@radionet.app"
+          git add -A
+          # Zwei -m statt einer mehrzeiligen Zeichenkette: eine
+          # Fortsetzungszeile muesste auf Spalte 0 beginnen und wuerde damit
+          # aus diesem YAML-Block ausbrechen ("could not find expected ':'").
+          git commit -q \
+            -m "APT-Repository aus ${GITHUB_REPOSITORY}@${GITHUB_SHA::7}" \
+            -m "Erzeugt von packages.yml. Dieser Branch wird bei jeder Veroeffentlichung neu geschrieben - Aenderungen hier von Hand gehen verloren."
+
+          # --force: der Branch traegt nur den jeweils aktuellen Stand. Eine
+          # Historie waere hier wertlos und liesse das Repository mit jeder
+          # Veroeffentlichung um die Paketgroesse wachsen (~2 MB pro Lauf).
+          git push --force --quiet \
+            "https://x-access-token:${DEPLOY_TOKEN}@github.com/${TARGET_REPO}.git" \
+            "$TARGET_BRANCH"
+
+          echo "Nach ${TARGET_REPO} (${TARGET_BRANCH}) veroeffentlicht."
+
+      - name: Verify it is actually reachable
+        run: |
+          # Pages braucht nach dem Push einen Moment. Ohne diese Kontrolle
+          # meldet der Lauf Erfolg, obwohl die Quelle fuer kein einziges
+          # System erreichbar ist - und das faellt erst beim ISO-Bau auf.
+          echo "Warte auf Pages-Auslieferung unter ${PUBLIC_URL} ..."
+          ok=0
+          for i in $(seq 1 20); do
+            code=$(curl -sSL -o /dev/null -w '%{http_code}' --max-time 20 \
+                   "${PUBLIC_URL}/dists/trixie/InRelease" || echo 000)
+            echo "  Versuch $i: HTTP $code"
+            if [ "$code" = "200" ]; then ok=1; break; fi
+            sleep 15
+          done
+
+          if [ "$ok" -ne 1 ]; then
+            echo "::warning::InRelease ist noch nicht erreichbar."
+            echo "Der Push hat funktioniert, aber Pages liefert noch nicht aus."
+            echo "Beim ERSTEN Mal ist das normal und braucht eine Einstellung:"
+            echo "  ${TARGET_REPO} -> Settings -> Pages"
+            echo "  Source: 'Deploy from a branch', Branch: ${TARGET_BRANCH} / (root)"
+            echo "Danach diesen Workflow erneut starten."
+            exit 0
+          fi
+
+          echo "Repository ist erreichbar."
+
+          # Gegenpruefen, dass die Signatur zum veroeffentlichten Schluessel
+          # passt - die eigentliche Frage. Eine erreichbare Quelle mit
+          # unpassender Signatur wird von jedem installierten System
+          # abgelehnt, und niemand bekaeme mehr Updates.
+          #
+          # gpgv liegt in einem eigenen Paket und ist nicht garantiert
+          # vorhanden, deshalb explizit installieren statt darauf zu hoffen:
+          # ein fehlendes gpgv wuerde hier sonst wie eine kaputte Signatur
+          # aussehen.
+          sudo apt-get install -y --no-install-recommends gpgv >/dev/null 2>&1 || true
+          command -v gpgv >/dev/null || {
+            echo "::error::gpgv nicht verfuegbar - Signatur nicht pruefbar"; exit 1; }
+
+          curl -fsSL "${PUBLIC_URL}/viperos-archive-keyring.gpg" -o /tmp/key.gpg
+          curl -fsSL "${PUBLIC_URL}/dists/trixie/InRelease" -o /tmp/InRelease
+          if gpgv --keyring /tmp/key.gpg /tmp/InRelease 2>&1 | grep -q 'Good signature'; then
+            echo "Signatur gegen den veroeffentlichten Schluessel gueltig."
+          else
+            echo "::error::Die Signatur passt NICHT zum veroeffentlichten Schluessel."
+            echo "  Installierte Systeme wuerden diese Quelle ablehnen."
+            gpgv --keyring /tmp/key.gpg /tmp/InRelease 2>&1 | sed 's/^/    /'
+            exit 1
+          fi
 
       - name: Summary
         run: |
           {
             echo "### APT-Repository veroeffentlicht"
             echo ""
-            echo "${{ steps.deployment.outputs.page_url }}"
+            echo "${PUBLIC_URL}"
             echo ""
             echo "| Paket | Version |"
             echo "|---|---|"

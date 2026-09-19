@@ -34,9 +34,12 @@ if ! curl -fsSL --retry 3 --proto '=https' -o "$KEYRING" \
     echo "  FEHLER: Signierschluessel nicht erreichbar unter"
     echo "    $REPO_URL/viperos-archive-keyring.gpg"
     echo ""
-    echo "  Ist das Repository veroeffentlicht? Der Workflow packages.yml"
-    echo "  muss mindestens einmal erfolgreich gelaufen sein, und unter"
-    echo "  Settings -> Pages muss 'GitHub Actions' als Quelle stehen."
+    echo "  Ist das Repository veroeffentlicht? Es braucht beides:"
+    echo "    1. Der Workflow packages.yml muss mindestens einmal"
+    echo "       erfolgreich gelaufen sein (er pusht nach"
+    echo "       jellystream-app/viperos-apt, Branch gh-pages)."
+    echo "    2. In jenem Repository unter Settings -> Pages:"
+    echo "       Source 'Deploy from a branch', Branch gh-pages / (root)."
     exit 1
 fi
 

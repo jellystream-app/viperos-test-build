@@ -40,6 +40,14 @@ Published to GitHub Pages at
 `https://jellystream-app.github.io/viperos-apt`, because an APT repository is
 nothing but static files plus a GPG signature.
 
+The repository lives in its **own** GitHub project,
+`jellystream-app/viperos-apt`, separate from this one. `packages.yml` builds
+and signs it here and then pushes the result to that project's `gh-pages`
+branch — `actions/deploy-pages` can only serve Pages of the repository it runs
+in, which is why this is a push rather than a Pages deployment. Keeping them
+apart also means an ISO commit can never disturb the source every installed
+system updates from.
+
 `viperos-settings` installs the source and the public signing key, so an
 installed ViperOS is already subscribed. To set it up on a plain Debian 13:
 
@@ -72,13 +80,23 @@ for a theme release.
 
 ### One-time setup
 
-- **Settings → Pages → Source: GitHub Actions**
-- **Settings → Secrets → Actions →** `APT_SIGNING_KEY`, the private key in
-  ASCII-armored form (`live-test/make-signing-key.sh` generates the pair)
+In **this** repository, under Settings → Secrets and variables → Actions:
 
-Keep a backup of that private key somewhere safe. Without it the repository
-can never be updated again, because installed systems would reject a
-signature from a different key.
+| Secret | Contents |
+|---|---|
+| `APT_SIGNING_KEY` | the private signing key, ASCII-armored (`live-test/make-signing-key.sh` generates the pair) |
+| `APT_DEPLOY_TOKEN` | a token with write access to `jellystream-app/viperos-apt` — the run's own `GITHUB_TOKEN` is scoped to this repository only |
+
+For the token, a fine-grained PAT is enough: Repository access → only
+`viperos-apt`, Permissions → Contents: Read and write.
+
+In **jellystream-app/viperos-apt**, after the first successful run:
+Settings → Pages → Source: *Deploy from a branch*, Branch: `gh-pages` / `(root)`.
+
+Keep a backup of the private key somewhere safe. Without it the repository can
+never be updated again, because installed systems would reject a signature
+from a different key. Its fingerprint is `17896F36…A118779F` and it expires in
+2031.
 
 ## Build
 
