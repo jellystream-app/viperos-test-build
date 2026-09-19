@@ -508,8 +508,16 @@ class Hub(Gtk.Window):
         card.get_style_context().add_class("card")
         text = Gtk.Label(xalign=0)
         text.set_line_wrap(True)
+        # Version aus os-release lesen statt sie hier einzutragen: das Paket
+        # viperos-settings pflegt diese Datei, und eine zweite Stelle mit
+        # derselben Zahl waere nach dem ersten Update falsch.
+        rel = os_release()
+        version = rel.get("VERSION") or rel.get("VERSION_ID") or ""
+        name = rel.get("NAME") or "ViperOS"
         text.set_markup(
-            "<b>ViperOS 1.0</b>\n\n"
+            "<b>%s %s</b>\n\n" % (
+                GLib.markup_escape_text(name),
+                GLib.markup_escape_text(version)) +
             "Ein schlankes Live-System auf Basis von Debian 13 (Trixie) mit "
             "GNOME-Desktop. Gedacht zum Ausprobieren, Arbeiten und Installieren – "
             "ohne Ballast und ohne Telemetrie.\n\n"

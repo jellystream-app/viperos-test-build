@@ -66,7 +66,7 @@ which zenity || apt-get install -y zenity 2>/dev/null || true
 
 echo "[ViperosOS] Finale Konfiguration abgeschlossen."
 echo ""
-echo "  ✓ ViperosOS 1.0 Build-Konfiguration komplett"
+echo "  ViperOS 2.0 Build-Konfiguration komplett"
 echo "  ✓ Live-User: viperos / viperos"
 echo "  ✓ Desktop: GNOME Shell 48 mit ViperOS-Theme"
 echo "  ✓ Browser: Firefox ESR"

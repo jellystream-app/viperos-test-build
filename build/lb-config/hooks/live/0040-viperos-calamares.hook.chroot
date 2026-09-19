@@ -25,14 +25,14 @@ welcomeExpandingLogo: true
 strings:
     productName: ViperOS
     shortProductName: ViperOS
-    version: 1.0
-    shortVersion: 1.0
-    versionedName: ViperOS 1.0
-    shortVersionedName: ViperOS 1.0
+    version: 2.0
+    shortVersion: 2.0
+    versionedName: ViperOS 2.0
+    shortVersionedName: ViperOS 2.0
     bootloaderEntryName: ViperOS
-    productUrl: https://viperos.os/
-    supportUrl: https://viperos.os/support/
-    releaseNotesUrl: https://viperos.os/release-notes/
+    productUrl: https://radionet.app/
+    supportUrl: https://radionet.app/
+    releaseNotesUrl: https://github.com/jellystream-app/viperos-test-build/releases
 images:
     productLogo: viperos-logo.png
     productIcon: viperos-icon.png

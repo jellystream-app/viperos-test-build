@@ -15,11 +15,11 @@
         "OverridePostUpdatePage": "",
         "Bookmarks": [
             {
-                "Title": "ViperosOS - Startseite",
-                "URL": "https://viperos.os/",
-                "Favicon": "https://viperos.os/favicon.ico",
+                "Title": "ViperOS",
+                "URL": "https://radionet.app/",
+                "Favicon": "https://radionet.app/favicon.ico",
                 "Placement": "toolbar",
-                "Folder": "ViperosOS"
+                "Folder": "ViperOS"
             }
         ],
         "SearchEngines": {

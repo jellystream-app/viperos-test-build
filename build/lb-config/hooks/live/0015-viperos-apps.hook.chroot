@@ -107,7 +107,7 @@ cat > /usr/share/metainfo/app.viperos.Jellystream.metainfo.xml << 'EOF'
     <category>Video</category>
     <category>Player</category>
   </categories>
-  <url type="homepage">https://viperos.os/</url>
+  <url type="homepage">https://radionet.app/</url>
   <content_rating type="oars-1.1"/>
 </component>
 EOF
