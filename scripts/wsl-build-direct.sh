@@ -43,12 +43,23 @@ cd "$BUILD_DIR"
 # Konfiguration kopieren
 log "Kopiere live-build Konfiguration..."
 mkdir -p auto config/package-lists config/hooks/live config/includes.chroot \
-         config/includes.chroot_before_packages
+         config/includes.chroot_before_packages config/archives
 
 cp -r "${WIN_PROJECT}/build/lb-config/auto/." "${BUILD_DIR}/auto/"
 cp -r "${WIN_PROJECT}/build/lb-config/package-lists/." "${BUILD_DIR}/config/package-lists/"
 cp -r "${WIN_PROJECT}/build/lb-config/hooks/." "${BUILD_DIR}/config/hooks/"
 cp -r "${WIN_PROJECT}/build/lb-config/includes.chroot/." "${BUILD_DIR}/config/includes.chroot/"
+
+# ViperOS-Paketquelle samt Schluessel. Das MUSS ueber config/archives laufen:
+# live-build bindet die Quellen dort in chroot_archives ein und aktualisiert
+# danach die Indizes - also noch VOR der Paketinstallation. Ein Hook kann das
+# nicht leisten, weil chroot_hooks erst NACH der Installation laeuft; ohne
+# archives/ scheitert der Build mit "Unable to locate package viperos-desktop".
+if [ -d "${WIN_PROJECT}/build/lb-config/archives" ]; then
+    cp -r "${WIN_PROJECT}/build/lb-config/archives/." \
+          "${BUILD_DIR}/config/archives/"
+fi
+
 # apt-Absicherung (99viperos-retry) - muss VOR der Paketinstallation im
 # Chroot liegen, sonst greifen die Retry-Einstellungen nicht.
 if [ -d "${WIN_PROJECT}/build/lb-config/includes.chroot_before_packages" ]; then

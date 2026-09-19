@@ -370,6 +370,53 @@ jobs:
             echo "  das ISO weder Hub noch Theme noch Systemvorgaben."
             exit 1; }
 
+          # Stehen eigene Pakete in der Liste, MUSS die Quelle ueber
+          # config/archives eingebunden werden. Ein Hook genuegt nicht:
+          # live-build fuehrt alle *.hook.chroot in chroot_hooks aus, und das
+          # laeuft NACH chroot_install-packages. Genau daran scheiterte ein
+          # Build mit "E: Unable to locate package viperos-desktop" - die
+          # Hook-Nummer 0005 ordnet nur unter den Hooks, nicht davor.
+          A=build/lb-config/archives
+          for f in "$A"/viperos.list.chroot "$A"/viperos.key.chroot; do
+            [ -f "$f" ] || {
+              echo "::error::$f fehlt."
+              echo "  Ohne config/archives kennt apt die ViperOS-Quelle beim"
+              echo "  Installieren nicht, und der Build bricht mit"
+              echo "  'Unable to locate package viperos-desktop' ab."
+              exit 1; }
+          done
+          echo "Paketquelle in config/archives:"
+          sed 's/^/    /' "$A"/viperos.list.chroot
+
+          # Der Schluessel dort muss derselbe sein, mit dem das Repository
+          # signiert ist - also der, den auch viperos-settings ausliefert.
+          # Sonst verwirft apt die Quelle als unsigniert, mitten im Build.
+          if cmp -s "$A/viperos.key.chroot" \
+             packages/viperos-settings/usr/share/keyrings/viperos-archive-keyring.gpg; then
+            echo "    Schluessel stimmt mit dem im Paket ueberein."
+          else
+            echo "::error::$A/viperos.key.chroot weicht vom Keyring in"
+            echo "  viperos-settings ab. Beide muessen zur Signatur des"
+            echo "  Repositories passen."
+            exit 1
+          fi
+
+          # Die URL in beiden Dateien muss dieselbe sein: archives/ versorgt
+          # den Build, das Paket das installierte System. Zeigen sie auf
+          # verschiedene Repositories, bekommt der Nutzer Updates von woanders
+          # als aus dem, womit sein ISO gebaut wurde.
+          url_a=$(grep -oE 'https?://[^ ]+' "$A/viperos.list.chroot" | head -1)
+          url_p=$(sed -n 's|^URIs: *||p' \
+                  packages/viperos-settings/etc/apt/sources.list.d/viperos.sources | head -1)
+          if [ "$url_a" = "$url_p" ]; then
+            echo "    URL identisch: $url_a"
+          else
+            echo "::error::Verschiedene Repository-URLs:"
+            echo "    archives/: $url_a"
+            echo "    Paket:     $url_p"
+            exit 1
+          fi
+
           missing=''
           while IFS= read -r line || [ -n "$line" ]; do
             p=$(printf '%s' "${line%%#*}" | tr -d '[:space:]')
@@ -677,7 +724,11 @@ jobs:
                    -o -name "build" -o -name "clean" \) -exec sed -i "s/\r$//" {} +
 
               mkdir -p config
-              for c in hooks package-lists includes.chroot includes.chroot_before_packages; do
+              # archives/ MUSS dabei sein: dort liegen die ViperOS-Paketquelle und ihr
+              # Schluessel. live-build bindet sie in chroot_archives ein und
+              # aktualisiert danach die Indizes - also VOR der Paketinstallation.
+              # Ein Hook kann das nicht leisten, chroot_hooks laeuft erst danach.
+              for c in archives hooks package-lists includes.chroot includes.chroot_before_packages; do
                 [ -d "$c" ] || continue
                 rm -rf "config/$c"; cp -a "$c" "config/$c"
               done

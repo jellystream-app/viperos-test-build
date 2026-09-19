@@ -59,6 +59,14 @@ os-release      text eol=lf
 # piped into bash. This is the root cause of the original build failure.
 *.ps1           text eol=lf
 
+# Der APT-Signierschluessel in config/archives ist BINAER, traegt aber die
+# Endung .chroot und fiele damit unter die Textregeln oben ("*.chroot text
+# eol=lf"). Git wuerde beim Auschecken Zeilenenden umschreiben und den
+# Schluessel zerstoeren - apt meldet dann "no valid OpenPGP data found", und
+# der ISO-Bau bricht ab, weil die Paketquelle als unsigniert gilt. Diese
+# Zeile steht NACH den Textregeln, damit sie gewinnt.
+build/lb-config/archives/*.key.chroot  binary
+
 # Binary assets must never be touched
 *.png           binary
 *.jpg           binary

@@ -1,112 +1,116 @@
 #!/bin/bash
-# ViperosOS - eigene Paketquelle eintragen
+# ViperosOS - ViperOS-Paketquelle gegenpruefen
 #
-# Dieser Hook laeuft VOR allen anderen (0005), weil die ViperOS-Pakete aus
-# dieser Quelle kommen. Ohne sie wuerde "viperos-desktop" in der Paketliste
-# nicht gefunden und der Build scheitern.
+# WICHTIG - das war zuvor falsch:
+# Dieser Hook trug die Paketquelle selbst ein und holte den Signierschluessel
+# per curl. Das konnte nicht funktionieren. live-build fuehrt ALLE
+# *.hook.chroot erst in "chroot_hooks" aus, und das steht in seinem Ablauf
+# NACH der Paketinstallation:
 #
-# Warum der Eintrag hier steht und nicht nur im Paket viperos-settings:
-# Das ist ein Henne-Ei-Problem. viperos-settings BRINGT die Quelle mit, aber
-# um das Paket zu installieren, muss die Quelle bereits bekannt sein. Also
-# wird sie hier vorab eingetragen; sobald viperos-settings installiert ist,
-# ueberschreibt es diese Datei mit einer identischen Fassung und ist danach
-# ihr Besitzer. Das ist Absicht - auf dem installierten System soll dpkg die
-# Quelle verwalten, nicht ein Build-Hook.
+#   lb chroot_archives                    <- Quellen einbinden, apt update
+#   lb chroot_includes_before_packages
+#   for _PASS in install live; do
+#       lb chroot_package-lists
+#       lb chroot_install-packages        <- hier wird viperos-desktop geholt
+#   done
+#   lb chroot_includes_after_packages
+#   lb chroot_hooks                       <- erst hier liefen wir
+#
+# Die Nummer 0005 steuert nur die Reihenfolge UNTER den Hooks, nicht relativ
+# zur Installation. Der Build brach deshalb ab mit:
+#   E: Unable to locate package viperos-desktop
+#
+# Richtig ist config/archives/ (build/lb-config/archives/):
+#   viperos.list.chroot  - die Paketquelle
+#   viperos.key.chroot   - der oeffentliche Signierschluessel
+# live-build bindet beides in chroot_archives ein, legt den Schluessel nach
+# /etc/apt/trusted.gpg.d/ und ruft danach "Apt chroot update" auf - alles vor
+# der Installation.
+#
+# Auch includes.chroot_before_packages half nicht: die Dateien landen dort
+# zwar rechtzeitig, aber chroot_install-packages fuehrt kein "apt-get update"
+# aus (nur wenn fremde Architekturen dazukamen). apt kennt eine so abgelegte
+# Quelle also nicht.
+#
+# Dieser Hook prueft jetzt nur noch nach, dass es geklappt hat - und dass die
+# ViperOS-Pakete tatsaechlich aus dem eigenen Repo stammen.
 
 set -e
 
-echo "[ViperosOS] Trage ViperOS-Paketquelle ein..."
+echo "[ViperosOS] Pruefe ViperOS-Paketquelle..."
 
-KEYRING=/usr/share/keyrings/viperos-archive-keyring.gpg
 REPO_URL="https://jellystream-app.github.io/viperos-apt"
 
-mkdir -p /usr/share/keyrings /etc/apt/sources.list.d
-
 # ----------------------------------------------------------------------
-# Signierschluessel holen
+# 1. Sind die eigenen Pakete installiert?
 #
-# Der Schluessel liegt im Repository selbst. Das ist unbedenklich, weil der
-# Build ueber HTTPS laeuft und der Schluessel nur den oeffentlichen Teil
-# enthaelt - er dient dazu, die Signatur zu PRUEFEN, nicht sie zu erzeugen.
+# Das ist die eigentliche Frage. Fehlen sie, hat live-build sie nicht
+# installieren koennen - und das faellt sonst erst im gebooteten System auf,
+# als Desktop ohne Theme, ohne Hub und ohne Paketquelle.
 # ----------------------------------------------------------------------
-if ! curl -fsSL --retry 3 --proto '=https' -o "$KEYRING" \
-        "$REPO_URL/viperos-archive-keyring.gpg"; then
-    echo "  FEHLER: Signierschluessel nicht erreichbar unter"
-    echo "    $REPO_URL/viperos-archive-keyring.gpg"
+missing=""
+for pkg in viperos-settings viperos-desktop-theme \
+           viperos-panel-extension viperos-hub viperos-desktop; do
+    if dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "install ok installed"; then
+        echo "  installiert: $pkg $(dpkg-query -W -f='${Version}' "$pkg")"
+    else
+        missing="$missing $pkg"
+    fi
+done
+
+if [ -n "$missing" ]; then
+    echo "  FEHLER: diese ViperOS-Pakete fehlen:$missing"
     echo ""
-    echo "  Ist das Repository veroeffentlicht? Es braucht beides:"
-    echo "    1. Der Workflow packages.yml muss mindestens einmal"
-    echo "       erfolgreich gelaufen sein (er pusht nach"
-    echo "       jellystream-app/viperos-apt, Branch gh-pages)."
-    echo "    2. In jenem Repository unter Settings -> Pages:"
-    echo "       Source 'Deploy from a branch', Branch gh-pages / (root)."
-    exit 1
-fi
-
-# Der Schluessel muss binaer sein, nicht ASCII-armored: apt liest unter
-# Signed-By nur ein Keyring im Binaerformat. Ein versehentlich armored
-# Schluessel fuehrt zu "no valid OpenPGP data found" - erst beim Update.
-if head -c 30 "$KEYRING" | grep -q 'BEGIN PGP'; then
-    echo "  Schluessel ist ASCII-armored - konvertiere nach binaer"
-    gpg --dearmor < "$KEYRING" > "$KEYRING.bin" && mv "$KEYRING.bin" "$KEYRING"
-fi
-
-# Ein privater Schluessel darf hier unter keinen Umstaenden landen.
-if grep -qa 'PRIVATE KEY BLOCK\|SECRET KEY BLOCK' "$KEYRING"; then
-    echo "  FEHLER: Der geholte Schluessel enthaelt privates Material."
-    exit 1
-fi
-
-chmod 0644 "$KEYRING"
-echo "  Schluessel: $(stat -c%s "$KEYRING") Bytes"
-
-# ----------------------------------------------------------------------
-# Quelle eintragen (deb822-Format)
-#
-# Kommentare beginnen mit "#", NICHT mit "//" - mit "//" meldet apt
-# "Malformed stanza" und ignoriert die Datei stillschweigend.
-# ----------------------------------------------------------------------
-cat > /etc/apt/sources.list.d/viperos.sources << EOF
-# ViperOS-Paketquelle (vorab durch Hook 0005; spaeter von viperos-settings
-# verwaltet). Ueber diese Quelle kommen Hub, Theme, Erweiterung und
-# Systemvorgaben - auch auf bereits installierte Systeme.
-Types: deb
-URIs: ${REPO_URL}
-Suites: trixie
-Components: main
-Architectures: amd64
-Signed-By: ${KEYRING}
-EOF
-
-apt-get update
-
-# Gegenpruefen, dass die Quelle wirklich gelesen wurde. Ohne diese Kontrolle
-# faellt ein Signaturfehler erst auf, wenn apt-get install das Paket nicht
-# findet - mit einer Meldung, die auf die Paketliste zeigt statt auf die
-# Quelle.
-#
-# Geprueft wird der KANDIDAT, nicht ein Wort in der Ausgabe. Zuvor stand hier
-# grep 'ViperOS' - das konnte nie zutreffen: apt-cache policy nennt die
-# Quell-URL, und die ist kleingeschrieben (viperos-apt). Der Hook brach
-# deshalb unter "set -e" ab und liess den ganzen ISO-Bau scheitern, obwohl
-# das Paket direkt darunter mit "Candidate: 2.0.0" aufgelistet war.
-CANDIDATE=$(apt-cache policy viperos-desktop 2>/dev/null \
-            | awk '/Candidate:/ {print $2; exit}')
-
-if [ -n "$CANDIDATE" ] && [ "$CANDIDATE" != "(none)" ]; then
-    echo "  Quelle aktiv - viperos-desktop $CANDIDATE gefunden."
-    # Herkunft ausgeben: sie muss unsere Quelle sein, nicht Debian.
-    apt-cache policy viperos-desktop 2>/dev/null \
-      | grep -F "$REPO_URL" | sed 's/^ */    /' \
-      || echo "    WARNUNG: Kandidat stammt nicht aus $REPO_URL"
-else
-    echo "  FEHLER: viperos-desktop ist nicht installierbar."
     echo "  Moegliche Ursachen:"
-    echo "    - das Repository ist leer (packages.yml noch nicht gelaufen)"
-    echo "    - die Signatur passt nicht zum ausgelieferten Schluessel"
-    echo "    - apt hat die Quelle wegen eines Formatfehlers verworfen"
-    apt-cache policy viperos-desktop 2>&1 | sed 's/^/    /'
+    echo "    - build/lb-config/archives/ wurde nicht nach config/archives"
+    echo "      kopiert (siehe die Kopierliste im Build-Workflow)"
+    echo "    - das Repository ist nicht erreichbar oder leer"
+    echo "    - die Signatur passt nicht zum Schluessel in archives/"
     exit 1
 fi
 
-echo "[ViperosOS] ViperOS-Paketquelle eingetragen."
+# ----------------------------------------------------------------------
+# 2. Stammen sie aus dem ViperOS-Repo?
+#
+# Ein Paket koennte theoretisch auch aus einer lokalen Ablage kommen. Dann
+# waere das installierte System nicht an die Quelle angebunden, und genau
+# das soll ViperOS 2.0 ja leisten.
+# ----------------------------------------------------------------------
+if apt-cache policy viperos-desktop 2>/dev/null | grep -qF "$REPO_URL"; then
+    echo "  Herkunft bestaetigt: $REPO_URL"
+else
+    echo "  WARNUNG: viperos-desktop stammt nicht aus $REPO_URL"
+    apt-cache policy viperos-desktop 2>&1 | sed 's/^/    /'
+fi
+
+# ----------------------------------------------------------------------
+# 3. Bleibt die Quelle im installierten System eingetragen?
+#
+# Dafuer sorgt die Datei aus dem Paket viperos-settings. Der Eintrag aus
+# config/archives gilt NUR waehrend des Builds: live-build loescht am Ende
+# sowohl die Quelldatei als auch den Schluessel wieder (chroot_archives,
+# "rm -f chroot/etc/apt/sources.list.d/..." und
+# "rm chroot/etc/apt/trusted.gpg.d/..." im remove-Durchlauf).
+#
+# Das ist der Grund, warum viperos-settings die Quelle als PAKETDATEI
+# mitbringt - ohne sie waere das installierte System von Updates
+# abgeschnitten, also genau von dem, wofuer V2 gebaut wurde.
+# ----------------------------------------------------------------------
+if [ -f /etc/apt/sources.list.d/viperos.sources ]; then
+    echo "  Dauerhafte Quelle vorhanden (aus viperos-settings):"
+    grep -vE '^#|^$' /etc/apt/sources.list.d/viperos.sources | sed 's/^/    /'
+else
+    echo "  FEHLER: /etc/apt/sources.list.d/viperos.sources fehlt."
+    echo "  Das installierte System waere von Updates abgeschnitten."
+    exit 1
+fi
+
+if [ -f /usr/share/keyrings/viperos-archive-keyring.gpg ]; then
+    echo "  Signierschluessel vorhanden ($(stat -c%s /usr/share/keyrings/viperos-archive-keyring.gpg) Bytes)"
+else
+    echo "  FEHLER: /usr/share/keyrings/viperos-archive-keyring.gpg fehlt."
+    echo "  apt wuerde die Quelle als unsigniert ablehnen."
+    exit 1
+fi
+
+echo "[ViperosOS] ViperOS-Paketquelle in Ordnung."

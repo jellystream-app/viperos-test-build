@@ -31,7 +31,9 @@ OUTPUT_DIR="/output"
 cd "$BUILD_DIR"
 
 mkdir -p config
-for component in hooks package-lists includes.chroot includes.chroot_before_packages; do
+# archives/ zuerst: enthaelt die ViperOS-Paketquelle samt Schluessel,
+# die live-build vor der Paketinstallation einbindet.
+for component in archives hooks package-lists includes.chroot includes.chroot_before_packages; do
     if [ -d "$component" ]; then
         rm -rf "config/$component"
         cp -a "$component" "config/$component"
