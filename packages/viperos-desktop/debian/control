@@ -1,0 +1,32 @@
+Source: viperos-desktop
+Section: metapackages
+Priority: optional
+Maintainer: ViperOS Project <viperos@radionet.app>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Homepage: https://radionet.app/
+Rules-Requires-Root: no
+
+Package: viperos-desktop
+Architecture: all
+Depends: ${misc:Depends},
+         viperos-settings (= 2.0.0),
+         viperos-desktop-theme,
+         viperos-panel-extension,
+         viperos-hub
+Recommends: gnome-shell-extension-dashtodock,
+            gnome-shell-extension-appindicator,
+            gnome-shell-extension-blur-my-shell,
+            gnome-shell-extension-desktop-icons-ng,
+            gnome-shell-extension-user-theme
+Description: ViperOS Desktop (Metapaket)
+ Zieht die ViperOS-Bestandteile zusammen: Systemvorgaben samt Paketquelle,
+ Erscheinungsbild, Shell-Erweiterung und den ViperOS Hub.
+ .
+ Die Paketliste des ISO-Baus nennt nur dieses Paket; alles andere folgt als
+ Abhaengigkeit. Wer ViperOS nachtraeglich auf einem Debian-System einrichten
+ will, installiert ebenfalls nur dieses Paket.
+ .
+ Die Erweiterungen in Recommends werden von den Systemvorgaben aktiviert.
+ Fehlt eine, startet die Sitzung trotzdem - GNOME ueberspringt Erweiterungen,
+ die es nicht findet. Deshalb stehen sie nicht in Depends.

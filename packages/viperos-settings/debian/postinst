@@ -1,0 +1,95 @@
+#!/bin/sh
+# ViperOS Systemvorgaben - Nachbereitung der Installation
+set -e
+
+case "$1" in
+configure)
+    # ------------------------------------------------------------------
+    # dconf-Datenbank kompilieren
+    #
+    # /etc/dconf/db/local.d/00-viperos ist Klartext; GNOME liest nur die
+    # kompilierte Datei /etc/dconf/db/local. Ohne diesen Aufruf greift keine
+    # einzige Vorgabe - der Desktop startet in GNOMEs Standardoptik.
+    # ------------------------------------------------------------------
+    if command -v dconf >/dev/null 2>&1; then
+        dconf update || echo "viperos-settings: dconf update fehlgeschlagen" >&2
+    fi
+
+    # ------------------------------------------------------------------
+    # GSettings-Schemata neu kompilieren
+    #
+    # 90_viperos.gschema.override setzt den Hintergrund gegen Debians
+    # 10_desktop-base.gschema.override durch (90 gewinnt gegen 10). Wirksam
+    # wird das erst nach dem Kompilieren.
+    # ------------------------------------------------------------------
+    if command -v glib-compile-schemas >/dev/null 2>&1; then
+        glib-compile-schemas /usr/share/glib-2.0/schemas/ >/dev/null 2>&1 \
+            || echo "viperos-settings: glib-compile-schemas fehlgeschlagen" >&2
+    fi
+
+    # ------------------------------------------------------------------
+    # os-release
+    #
+    # Diese Datei wird NICHT als Paketdatei ausgeliefert: /usr/lib/os-release
+    # gehoert dem Paket base-files. Zwei Pakete mit derselben Datei ergeben
+    # einen dpkg-Dateikonflikt, und die Installation bricht ab. Deshalb wird
+    # sie hier geschrieben.
+    #
+    # /etc/os-release ist ein Symlink auf ../usr/lib/os-release; geschrieben
+    # wird die Zieldatei, damit beide Pfade stimmen.
+    # ------------------------------------------------------------------
+    cat > /usr/lib/os-release << 'OSEOF'
+PRETTY_NAME="ViperOS 2.0 (Trixie)"
+NAME="ViperOS"
+VERSION_ID="2.0"
+VERSION="2.0 (Viper)"
+VERSION_CODENAME=viper
+ID=viperos
+ID_LIKE=debian
+HOME_URL="https://radionet.app/"
+SUPPORT_URL="https://radionet.app/"
+BUG_REPORT_URL="https://github.com/jellystream-app/viperos-test-build/issues"
+LOGO=viperos-logo
+OSEOF
+    # Falls /etc/os-release eine echte Datei ist statt eines Symlinks,
+    # bliebe sie sonst auf dem alten Stand.
+    if [ ! -L /etc/os-release ]; then
+        cp /usr/lib/os-release /etc/os-release
+    fi
+
+    # ------------------------------------------------------------------
+    # Distributions-Logo fuer den GNOME-"Ueber"-Dialog
+    #
+    # os-release verweist mit LOGO=viperos-logo auf ein Icon dieses Namens.
+    # Debian legt sein Pendant unter icons/hicolor/SIZE/places/ ab - dem
+    # folgen wir, sonst zeigt der Dialog gar nichts an.
+    # ------------------------------------------------------------------
+    if [ -f /usr/share/icons/hicolor/scalable/apps/viperos.svg ]; then
+        mkdir -p /usr/share/icons/hicolor/scalable/places
+        cp /usr/share/icons/hicolor/scalable/apps/viperos.svg \
+           /usr/share/icons/hicolor/scalable/places/viperos-logo.svg
+    fi
+    if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+        gtk-update-icon-cache -f /usr/share/icons/hicolor >/dev/null 2>&1 || true
+    fi
+
+    # ------------------------------------------------------------------
+    # GRUB-Distributor
+    #
+    # /etc/default/grub gehoert dem Paket grub-common und wird deshalb nur
+    # bearbeitet, nicht ersetzt.
+    # ------------------------------------------------------------------
+    if [ -f /etc/default/grub ]; then
+        if grep -q '^GRUB_DISTRIBUTOR=' /etc/default/grub; then
+            sed -i 's/^GRUB_DISTRIBUTOR=.*/GRUB_DISTRIBUTOR="ViperOS"/' \
+                /etc/default/grub
+        else
+            echo 'GRUB_DISTRIBUTOR="ViperOS"' >> /etc/default/grub
+        fi
+    fi
+    ;;
+esac
+
+#DEBHELPER#
+
+exit 0

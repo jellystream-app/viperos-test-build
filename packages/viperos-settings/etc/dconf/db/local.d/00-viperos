@@ -1,0 +1,217 @@
+# ============================================================
+# ViperOS - systemweite GNOME-Vorgaben
+# ============================================================
+#
+# Diese Datei wird von "dconf update" (postinst) nach /etc/dconf/db/local
+# kompiliert und gilt fuer JEDEN Benutzer - auch fuer den, den Calamares bei
+# der Installation anlegt. Deshalb bleibt das Erscheinungsbild nach der
+# Installation erhalten, nicht nur in der Live-Sitzung.
+#
+# Bewusst OHNE "lock": Nutzeraenderungen liegen in der user-Datenbank und
+# haben Vorrang. Ein Lock wuerde sie verhindern.
+#
+# WICHTIG: Ein Typfehler verwirft die GANZE Datei. "enabled-extensions=[]"
+# etwa ist fuer dconf nicht typisierbar ("unable to infer type"). Weil GDM
+# seine Greeter-Datenbank per ExecStartPre kompiliert, scheiterte dadurch
+# einmal der Dienststart - sichtbar erst beim Booten als "Failed to start
+# gdm.service". Der Preflight kompiliert diese Datei deshalb bei jedem Lauf.
+
+[org/gnome/desktop/interface]
+# Dunkles Erscheinungsbild als Standard
+color-scheme='prefer-dark'
+gtk-theme='Adwaita-dark'
+icon-theme='Papirus-Dark'
+cursor-theme='Adwaita'
+# Inter als Oberflaechenschrift, JetBrains Mono fuer Monospace
+font-name='Inter 11'
+document-font-name='Inter 11'
+monospace-font-name='JetBrains Mono 10'
+font-antialiasing='rgba'
+font-hinting='slight'
+# Akzentfarbe: GNOME 48 kann das nativ. Zulaessig sind blue, teal, green,
+# yellow, orange, red, pink, purple, slate. 'blue' passt zu den
+# ViperOS-Hintergruenden.
+accent-color='blue'
+clock-show-weekday=true
+clock-show-date=true
+show-battery-percentage=true
+enable-hot-corners=false
+
+[org/gnome/desktop/background]
+picture-uri='file:///usr/share/backgrounds/viperos/viperos-slate.jpg'
+picture-uri-dark='file:///usr/share/backgrounds/viperos/viperos-slate.jpg'
+picture-options='zoom'
+primary-color='#20232c'
+secondary-color='#4a5769'
+
+[org/gnome/desktop/screensaver]
+picture-uri='file:///usr/share/backgrounds/viperos/viperos-slate.jpg'
+picture-options='zoom'
+primary-color='#20232c'
+secondary-color='#4a5769'
+
+[org/gnome/desktop/wm/preferences]
+# Fensterknoepfe LINKS wie bei macOS - der sichtbarste Unterschied zu
+# Fedora/Standard-GNOME, wo sie rechts sitzen.
+button-layout='close,minimize,maximize:appmenu'
+titlebar-font='Inter SemiBold 11'
+focus-mode='click'
+action-double-click-titlebar='toggle-maximize'
+num-workspaces=4
+
+# ============================================================
+# Erweiterungen
+# ============================================================
+
+[org/gnome/shell]
+# UUIDs gegen metadata.json der jeweiligen Pakete geprueft.
+# viperos-panel@viperos.os ist unsere eigene Erweiterung. Sie aendert
+# nichts am Aussehen der Leiste - das steht vollstaendig im Theme-CSS.
+# Sie stoesst nur die Neuberechnung der Arbeitsflaechen-Regionen an,
+# damit "Desktop Icons" (ding@rastersoft.com) seine Symbole unterhalb
+# der Leiste ablegt statt darunter.
+enabled-extensions=['viperos-panel@viperos.os', 'dash-to-dock@micxgx.gmail.com', 'ubuntu-appindicators@ubuntu.com', 'blur-my-shell@aunetx', 'ding@rastersoft.com', 'user-theme@gnome-shell-extensions.gcampax.github.com']
+favorite-apps=['firefox-esr.desktop', 'org.gnome.Nautilus.desktop', 'jellystream.desktop', 'code.desktop', 'org.gnome.Terminal.desktop', 'viperos-hub.desktop']
+disable-user-extensions=false
+welcome-dialog-last-shown-version='48.0'
+
+[org/gnome/shell/extensions/user-theme]
+# Laedt /usr/share/themes/ViperOS/gnome-shell/gnome-shell.css
+name='ViperOS'
+
+[org/gnome/shell/extensions/dash-to-dock]
+# Schwebendes Dock am unteren Rand, nicht randlos ueber die ganze Breite.
+# Fedora zeigt das Dash nur in der Uebersicht; hier ist es dauerhaft da,
+# zentriert und abgerundet - das praegt den ersten Eindruck am staerksten.
+dock-position='BOTTOM'
+extend-height=false
+dock-fixed=false
+autohide=true
+intellihide=true
+intellihide-mode='FOCUS_APPLICATION_WINDOWS'
+require-pressure-to-show=true
+animation-time=0.18
+hide-delay=0.2
+show-delay=0.15
+transparency-mode='FIXED'
+background-opacity=0.55
+custom-background-color=true
+background-color='#12151f'
+# Punkte unter laufenden Anwendungen statt Striche
+running-indicator-style='DOTS'
+custom-theme-customize-running-dots=true
+custom-theme-running-dots-color='#6a8fd8'
+show-apps-at-top=true
+show-show-apps-button=true
+show-trash=false
+show-mounts=false
+show-favorites=true
+isolate-workspaces=false
+click-action='minimize-or-previews'
+scroll-action='cycle-windows'
+dash-max-icon-size=46
+icon-size-fixed=true
+custom-theme-shrink=true
+apply-custom-theme=false
+# Abstand zum Bildschirmrand, damit es wirklich schwebt
+customize-alphes=true
+height-fraction=0.9
+
+[org/gnome/shell/extensions/blur-my-shell]
+hacks-level=1
+
+# Panel-Blur AUS - das ist der Grund, warum die Ecken der Leiste eckig
+# blieben: blur-my-shell schiebt ein eigenes Widget hinter das Panel
+# (components/panel.js: panel_box.insert_child_at_index(background_group, 0))
+# und setzt dessen Groesse exakt auf die Panel-Maße. Dieses Widget ist
+# RECHTECKIG - einen corner-radius gibt es im Schema nur fuer
+# dash-to-dock, nicht fuer das Panel. Unsere abgerundeten Ecken sind
+# zwar transparent, aber dahinter deckt das Blur-Widget, also sieht man
+# weiterhin eine eckige Leiste.
+[org/gnome/shell/extensions/blur-my-shell/panel]
+blur=false
+override-background=false
+[org/gnome/shell/extensions/blur-my-shell/overview]
+blur=true
+brightness=0.6
+sigma=30
+# Beim Dock funktioniert der Blur mit runden Ecken, weil blur-my-shell
+# hier einen corner-radius kennt (Standard 12) - der Wert passt zur
+# Rundung des Docks.
+[org/gnome/shell/extensions/blur-my-shell/dash-to-dock]
+blur=true
+brightness=0.6
+sigma=30
+corner-radius=22
+static-blur=true
+[org/gnome/shell/extensions/blur-my-shell/applications]
+blur=false
+
+[org/gnome/shell/extensions/ding]
+show-home=true
+show-trash=false
+start-corner='top-left'
+icon-size='standard'
+
+# ============================================================
+# Verhalten
+# ============================================================
+
+[org/gnome/mutter]
+# Dynamische Arbeitsflaechen wie in Fedora
+dynamic-workspaces=true
+workspaces-only-on-primary=true
+edge-tiling=true
+center-new-windows=true
+attach-modal-dialogs=true
+
+[org/gnome/desktop/peripherals/touchpad]
+tap-to-click=true
+natural-scroll=true
+two-finger-scrolling-enabled=true
+
+[org/gnome/desktop/wm/keybindings]
+# Super allein oeffnet die Uebersicht (GNOME-Standard). Frueher lag hier
+# unter XFCE ein xcape-Umweg, der auf die Textkonsole sprang - unter GNOME
+# ist das nativ und braucht keine Hilfskonstruktion.
+switch-applications=['<Super>Tab']
+switch-windows=['<Alt>Tab']
+close=['<Super>q', '<Alt>F4']
+toggle-maximized=['<Super>Up']
+minimize=['<Super>h']
+switch-to-workspace-left=['<Super><Control>Left']
+switch-to-workspace-right=['<Super><Control>Right']
+
+[org/gnome/settings-daemon/plugins/media-keys]
+terminal=['<Super>t']
+home=['<Super>e']
+www=['<Super>b']
+control-center=['<Super>i']
+screensaver=['<Super>l']
+
+[org/gnome/desktop/session]
+idle-delay=uint32 600
+
+[org/gnome/settings-daemon/plugins/power]
+sleep-inactive-ac-type='nothing'
+sleep-inactive-battery-timeout=1800
+power-button-action='interactive'
+
+[org/gnome/nautilus/preferences]
+default-folder-viewer='icon-view'
+show-hidden-files=false
+[org/gnome/nautilus/icon-view]
+default-zoom-level='medium'
+
+[org/gnome/terminal/legacy]
+theme-variant='dark'
+default-show-menubar=false
+
+# Datenschutz
+[org/gnome/desktop/privacy]
+report-technical-problems=false
+send-software-usage-stats=false
+remember-recent-files=true
+
+[org/gnome/system/location]
+enabled=false

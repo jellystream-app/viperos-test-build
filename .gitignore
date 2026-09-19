@@ -24,6 +24,21 @@ scripts/.*.py
 *.deb
 *-preview.png
 
+# Ergebnisse des Paketbaus
+packages/out/
+
+# GEHEIME SCHLUESSEL - duerfen NIE ins Repository.
+# Der private Signierschluessel des APT-Repos liegt als GitHub-Secret
+# (APT_SIGNING_KEY). Landet er hier, kann jeder Pakete unter ViperOS-Namen
+# signieren und sie wuerden auf allen installierten Systemen als
+# vertrauenswuerdig gelten.
+*.asc
+*.gpg
+*.key
+*.sec
+secring.*
+!packages/viperos-settings/usr/share/keyrings/viperos-archive-keyring.gpg
+
 # OS-Kram
 Thumbs.db
 desktop.ini

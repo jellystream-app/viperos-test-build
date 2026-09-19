@@ -196,6 +196,45 @@ jobs:
             bad=1
           fi
 
+          # Die APT-Quelle im deb822-Format pruefen. Ein Formatfehler ist hier
+          # besonders heimtueckisch: apt meldet "Malformed stanza" und
+          # ignoriert die Datei, das System bekommt stillschweigend keine
+          # ViperOS-Updates mehr - genau das, was V2 erreichen soll.
+          #
+          # Aufgefallen ist das bei einem echten "apt-get update": in .sources
+          # beginnen Kommentare mit "#", nicht mit "//" (das gilt nur fuer
+          # apt.conf). Mit "//" war die ganze Quelle unwirksam.
+          for src in packages/*/etc/apt/sources.list.d/*.sources; do
+            [ -f "$src" ] || continue
+            echo "--- $src"
+            if grep -qE '^\s*//' "$src"; then
+              echo "::error::$src verwendet //-Kommentare; deb822 braucht #"
+              echo "  apt meldet dann 'Malformed stanza' und ignoriert die Quelle."
+              bad=1
+            fi
+            for field in Types URIs Suites Components Signed-By; do
+              grep -qE "^$field:" "$src" || {
+                echo "::error::$src: Feld $field fehlt"; bad=1; }
+            done
+            # Der Schluessel, auf den Signed-By zeigt, muss auch im Paket sein -
+            # sonst lehnt apt die Quelle als nicht signiert ab.
+            key=$(sed -n 's/^Signed-By: *//p' "$src" | head -1)
+            if [ -n "$key" ]; then
+              pkgdir=${src%%/etc/*}
+              if [ -f "$pkgdir${key}" ]; then
+                echo "      Signed-By vorhanden: $key"
+              else
+                echo "::error::$src verweist auf $key, das im Paket fehlt"
+                bad=1
+              fi
+            fi
+            # Der private Schluessel darf NIEMALS im Repository liegen.
+            if grep -rqa 'PRIVATE KEY\|SECRET KEY' "$pkgdir/usr/share/keyrings/" 2>/dev/null; then
+              echo "::error::Privater Signierschluessel in $pkgdir - niemals einchecken!"
+              bad=1
+            fi
+          done
+
           # /usr/local ist laut Debian Policy dem lokalen Administrator
           # vorbehalten; Paketdateien dort sind ein Policy-Verstoss.
           #

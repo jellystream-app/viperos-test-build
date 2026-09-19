@@ -1,0 +1,10 @@
+#!/usr/bin/make -f
+# ViperOS Systemvorgaben - Paketbau
+#
+# Reine Konfigurationsdateien. Die Arbeit passiert in debian/postinst:
+# dconf update, glib-compile-schemas und os-release.
+
+%:
+	dh $@
+
+override_dh_auto_test:

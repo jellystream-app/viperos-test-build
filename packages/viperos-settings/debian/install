@@ -1,0 +1,9 @@
+etc/dconf/db/local.d/00-viperos                    etc/dconf/db/local.d
+etc/dconf/profile/user                             etc/dconf/profile
+etc/gdm3/greeter.dconf-defaults                    etc/gdm3
+etc/apt/sources.list.d/viperos.sources             etc/apt/sources.list.d
+etc/firefox/policies/policies.json                 etc/firefox/policies
+usr/share/keyrings/viperos-archive-keyring.gpg     usr/share/keyrings
+usr/share/glib-2.0/schemas/90_viperos.gschema.override usr/share/glib-2.0/schemas
+usr/share/icons/hicolor/scalable/apps/viperos.svg  usr/share/icons/hicolor/scalable/apps
+usr/share/viperos/logo.txt                         usr/share/viperos

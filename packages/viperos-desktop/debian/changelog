@@ -1,0 +1,9 @@
+viperos-desktop (2.0.0) trixie; urgency=medium
+
+  * Erste Fassung. Buendelt die vier ViperOS-Pakete, damit die Paketliste des
+    ISO-Baus nur noch einen Eintrag braucht.
+  * viperos-settings ist auf die exakte Version festgelegt: es traegt die
+    Paketquelle ein, und eine abweichende Fassung koennte auf ein anderes
+    Repository zeigen als das, aus dem die uebrigen Pakete stammen.
+
+ -- ViperOS Project <viperos@radionet.app>  Fri, 19 Sep 2026 12:00:00 +0000

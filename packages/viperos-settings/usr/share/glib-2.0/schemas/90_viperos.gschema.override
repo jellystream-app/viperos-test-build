@@ -1,0 +1,16 @@
+[org.gnome.desktop.background]
+picture-options='zoom'
+picture-uri='file:///usr/share/backgrounds/viperos/viperos-slate.jpg'
+picture-uri-dark='file:///usr/share/backgrounds/viperos/viperos-slate.jpg'
+primary-color='#20232c'
+secondary-color='#4a5769'
+
+[org.gnome.desktop.screensaver]
+picture-options='zoom'
+picture-uri='file:///usr/share/backgrounds/viperos/viperos-slate.jpg'
+primary-color='#20232c'
+secondary-color='#4a5769'
+
+[org.gnome.desktop.interface]
+color-scheme='prefer-dark'
+accent-color='blue'

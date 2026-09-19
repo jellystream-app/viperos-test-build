@@ -1,0 +1,84 @@
+#!/bin/sh
+# ViperOS Systemvorgaben - Aufraeumen beim Entfernen
+set -e
+
+case "$1" in
+purge)
+    # ------------------------------------------------------------------
+    # os-release zuruecksetzen
+    #
+    # postinst SCHREIBT /usr/lib/os-release, statt die Datei als Paketdatei
+    # auszuliefern (sie gehoert base-files, zwei Besitzer waeren ein
+    # dpkg-Dateikonflikt). Der Preis dafuer: dpkg weiss nichts von der
+    # Aenderung und stellt sie beim Entfernen nicht zurueck. Ohne diesen
+    # Abschnitt hiess ein System nach "apt purge viperos-settings"
+    # weiterhin ViperOS - das ist bei einem Test tatsaechlich passiert.
+    #
+    # Die Originaldatei kommt aus base-files. dpkg-divert ist hier nicht
+    # nutzbar, weil wir die Datei nicht ersetzen, sondern ueberschreiben.
+    # ------------------------------------------------------------------
+    if [ -f /usr/lib/os-release ] && grep -q '^ID=viperos' /usr/lib/os-release; then
+        restored=no
+
+        # Bevorzugt aus dem Paketarchiv von base-files zurueckholen, falls
+        # es im Cache liegt - das ergibt genau die Originaldatei.
+        if command -v dpkg-query >/dev/null 2>&1; then
+            deb=$(ls /var/cache/apt/archives/base-files_*.deb 2>/dev/null | tail -1)
+            if [ -n "$deb" ] && command -v dpkg-deb >/dev/null 2>&1; then
+                tmp=$(mktemp -d)
+                if dpkg-deb -x "$deb" "$tmp" 2>/dev/null \
+                   && [ -f "$tmp/usr/lib/os-release" ]; then
+                    cp "$tmp/usr/lib/os-release" /usr/lib/os-release
+                    restored=yes
+                fi
+                rm -rf "$tmp"
+            fi
+        fi
+
+        # Rueckfallebene: eine minimale Debian-Kennung schreiben. Besser als
+        # eine Datei, die ein ViperOS behauptet, das nicht mehr installiert
+        # ist - Werkzeuge wie apt-listchanges und Fehlerberichte lesen sie.
+        if [ "$restored" = no ]; then
+            ver=$(cat /etc/debian_version 2>/dev/null || echo unknown)
+            cat > /usr/lib/os-release << OSEOF
+PRETTY_NAME="Debian GNU/Linux ${ver}"
+NAME="Debian GNU/Linux"
+VERSION_ID="${ver%%.*}"
+ID=debian
+HOME_URL="https://www.debian.org/"
+SUPPORT_URL="https://www.debian.org/support"
+BUG_REPORT_URL="https://bugs.debian.org/"
+OSEOF
+            echo "viperos-settings: os-release auf Debian-Standard zurueckgesetzt." >&2
+            echo "  Fuer die Originaldatei: apt-get install --reinstall base-files" >&2
+        fi
+
+        if [ ! -L /etc/os-release ] && [ -f /etc/os-release ]; then
+            cp /usr/lib/os-release /etc/os-release
+        fi
+    fi
+
+    # GRUB-Distributor zuruecksetzen; /etc/default/grub gehoert grub-common.
+    if [ -f /etc/default/grub ]; then
+        sed -i 's/^GRUB_DISTRIBUTOR="ViperOS"/GRUB_DISTRIBUTOR=`lsb_release -i -s 2> \/dev\/null || echo Debian`/' \
+            /etc/default/grub
+    fi
+
+    # Das Distributions-Logo wurde in postinst kopiert, nicht ausgeliefert.
+    rm -f /usr/share/icons/hicolor/scalable/places/viperos-logo.svg
+
+    # Die dconf-Datenbank neu bauen, damit die Vorgaben wirklich verschwinden.
+    # Die Klartextdatei hat dpkg schon entfernt; ohne "dconf update" bliebe
+    # die kompilierte Fassung mit allen ViperOS-Werten liegen.
+    if command -v dconf >/dev/null 2>&1; then
+        dconf update || true
+    fi
+    if command -v glib-compile-schemas >/dev/null 2>&1; then
+        glib-compile-schemas /usr/share/glib-2.0/schemas/ >/dev/null 2>&1 || true
+    fi
+    ;;
+esac
+
+#DEBHELPER#
+
+exit 0

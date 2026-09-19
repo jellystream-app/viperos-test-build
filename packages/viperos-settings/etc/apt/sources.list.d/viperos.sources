@@ -1,0 +1,27 @@
+# ViperOS-Paketquelle
+#
+# Hierueber erreichen Aktualisierungen von Hub, Theme, Erweiterung und
+# Systemvorgaben ein INSTALLIERTES System. Bis V1 gab es diese Quelle nicht:
+# alles Eigene entstand beim ISO-Bau, und "unattended-upgrades" hielt nur
+# Debian aktuell, weil es keine ViperOS-Quelle zum Abfragen hatte.
+#
+# Format: deb822 (.sources) statt der einzeiligen sources.list. Das ist seit
+# Trixie die empfohlene Schreibweise - jeder Wert steht in einem eigenen
+# Feld, und Signed-By verweist auf genau einen Schluessel, statt ihn global
+# im System zu vertrauen.
+#
+# Kommentare beginnen mit "#", NICHT mit "//". Mit "//" meldet apt
+# "Malformed stanza 1 in source list (type)" und ignoriert die ganze Datei -
+# das System bekaeme dann stillschweigend keine ViperOS-Updates. Die
+# "//"-Schreibweise gilt nur fuer apt.conf-Dateien, nicht fuer .sources.
+#
+# Signiert wird das Repository beim Veroeffentlichen in der CI; der
+# oeffentliche Schluessel liegt in diesem Paket unter
+# /usr/share/keyrings/. Ohne Signatur verweigert apt die Quelle.
+
+Types: deb
+URIs: https://jellystream-app.github.io/viperos-apt
+Suites: trixie
+Components: main
+Architectures: amd64
+Signed-By: /usr/share/keyrings/viperos-archive-keyring.gpg

@@ -1,0 +1,39 @@
+{
+    "policies": {
+        "Homepage": {
+            "URL": "about:home",
+            "Locked": false,
+            "StartPage": "previous-session"
+        },
+        "NewTabPage": true,
+        "DisplayMenuBar": "default-on",
+        "DisableAppUpdate": false,
+        "DisableTelemetry": true,
+        "DisableFirefoxStudies": true,
+        "DisablePocket": true,
+        "OverrideFirstRunPage": "about:home",
+        "OverridePostUpdatePage": "",
+        "Bookmarks": [
+            {
+                "Title": "ViperosOS - Startseite",
+                "URL": "https://viperos.os/",
+                "Favicon": "https://viperos.os/favicon.ico",
+                "Placement": "toolbar",
+                "Folder": "ViperosOS"
+            }
+        ],
+        "SearchEngines": {
+            "Default": "DuckDuckGo"
+        },
+        "Extensions": {
+            "Install": []
+        },
+        "Preferences": {
+            "browser.startup.homepage": "about:home",
+            "browser.newtabpage.enabled": true,
+            "browser.toolbars.bookmarks.visibility": "always",
+            "media.peerconnection.enabled": true,
+            "privacy.trackingprotection.enabled": true
+        }
+    }
+}

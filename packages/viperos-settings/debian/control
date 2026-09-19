@@ -1,0 +1,29 @@
+Source: viperos-settings
+Section: admin
+Priority: optional
+Maintainer: ViperOS Project <viperos@radionet.app>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Homepage: https://radionet.app/
+Rules-Requires-Root: no
+
+Package: viperos-settings
+Architecture: all
+Depends: ${misc:Depends},
+         dconf-cli,
+         dconf-gsettings-backend
+Recommends: viperos-desktop-theme
+Description: Systemweite Vorgaben und Paketquelle von ViperOS
+ Legt fest, wie ViperOS beim ersten Start aussieht und verhaelt: dunkles
+ Erscheinungsbild, Fensterknoepfe links, aktive Erweiterungen, Tastenkuerzel,
+ Datenschutzvorgaben und die Gestaltung des Anmeldebildschirms.
+ .
+ Die Vorgaben liegen als dconf-Systemdatenbank in /etc/dconf/db/local.d und
+ gelten damit fuer jeden Benutzer - auch fuer den, den der Installer anlegt.
+ Bewusst ohne Sperre: aendert ein Nutzer etwas, liegt seine Fassung in der
+ eigenen Datenbank und hat Vorrang.
+ .
+ Dieses Paket traegt ausserdem die ViperOS-Paketquelle samt Signierschluessel
+ ein. Erst dadurch erreichen Aktualisierungen von Hub, Theme und Vorgaben ein
+ bereits installiertes System; vorher entstand alles davon nur beim ISO-Bau
+ und war nach der Installation eingefroren.

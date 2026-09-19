@@ -1,0 +1,44 @@
+# ViperOS - Vorgaben fuer den Anmeldebildschirm
+#
+# Diese Datei ist via /usr/share/gdm/dconf/90-debian-settings verlinkt und
+# wird von generate-config in /var/lib/gdm3/greeter-dconf-defaults
+# kompiliert - der Datenbank, die GDMs dconf-Profil liest.
+
+[org/gnome/desktop/interface]
+color-scheme='prefer-dark'
+gtk-theme='Adwaita-dark'
+icon-theme='Papirus-Dark'
+cursor-theme='Adwaita'
+font-name='Inter 11'
+clock-show-weekday=true
+clock-show-date=true
+show-battery-percentage=true
+
+[org/gnome/login-screen]
+# Kein Debian-Logo: der Schluessel bleibt leer, damit gar keines erscheint.
+# (Ein eigenes Logo waere moeglich, wirkt auf dem Anmeldebildschirm neben
+#  dem Benutzerbild aber gedraengt.)
+logo=''
+banner-message-enable=false
+disable-user-list=false
+disable-restart-buttons=false
+enable-fingerprint-authentication=false
+enable-smartcard-authentication=false
+
+[org/gnome/desktop/background]
+picture-uri='file:///usr/share/backgrounds/viperos/viperos-slate.jpg'
+picture-uri-dark='file:///usr/share/backgrounds/viperos/viperos-slate.jpg'
+picture-options='zoom'
+primary-color='#20232c'
+secondary-color='#4a5769'
+
+[org/gnome/settings-daemon/plugins/power]
+sleep-inactive-ac-type='nothing'
+
+# Hinweis: Hier stand "enabled-extensions=[]". Eine leere Liste ohne
+# Typangabe kann dconf nicht zuordnen:
+#   error: enabled-extensions: invalid value: []: unable to infer type
+# dconf compile bricht dann ab -> generate-config scheitert als
+# ExecStartPre -> "Failed to start gdm.service". Die richtige Schreibweise
+# waere @as [] - der Eintrag ist aber ohnehin unnoetig, weil der
+# Anmeldebildschirm die Erweiterungen des Benutzers gar nicht laedt.
