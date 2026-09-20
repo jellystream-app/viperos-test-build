@@ -48,9 +48,23 @@ XKBOPTIONS=""
 BACKSPACE="guess"
 EOF
 
-# Desktop-Shortcuts für Live-User
+# ----------------------------------------------------------------------
+# Desktop des Live-Benutzers
+#
+# Hier stand frueher "cp /etc/skel/Desktop/* /home/viperos/Desktop/".
+# Das ist entfallen, weil /etc/skel/Desktop bewusst LEER bleibt:
+#
+#   Calamares legt das neue Konto mit "useradd -m" an, und das kopiert
+#   /etc/skel in dessen Home. Alles, was hier landet, erbt also das
+#   INSTALLIERTE System. Beim Installer-Symbol war das falsch - es zeigte
+#   nach der Installation auf ein calamares, das packages.conf gerade
+#   entfernt hatte.
+#
+# Hook 0040 legt das Symbol deshalb direkt in /home/viperos/Desktop.
+# Nicht durch eine skel-Kopie ersetzen: was fuer die Live-Sitzung gilt,
+# gilt nicht automatisch fuer das installierte System.
+# ----------------------------------------------------------------------
 mkdir -p /home/viperos/Desktop
-cp /etc/skel/Desktop/* /home/viperos/Desktop/ 2>/dev/null || true
 chown -R viperos:viperos /home/viperos/ 2>/dev/null || true
 
 # Systemd-Targets. Die Symlinks werden direkt gesetzt, weil systemctl im

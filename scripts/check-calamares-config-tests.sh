@@ -115,6 +115,28 @@ printf '\n  bad: [unclosed\n' >> "$C/modules/welcome.conf"
 expect_fail "ungueltiges YAML" "YAML"
 restore "$C/modules/welcome.conf"
 
+# I: Die Sequenz nennt eine Instanz, die unter "instances:" fehlt. Calamares
+# faende den Schritt nicht - das Aufraeumen im Zielsystem bliebe aus, und
+# der Installer-Menueeintrag zeigte dort weiter ins Leere.
+python3 - <<'PY'
+import pathlib
+p = pathlib.Path("build/lb-config/includes.chroot/etc/calamares/settings.conf")
+t = p.read_text(encoding="utf-8")
+t = t.replace("instances:\n- id:     cleanup\n  module: shellprocess\n"
+              "  config: shellprocess-cleanup.conf\n", "")
+p.write_text(t, encoding="utf-8")
+PY
+expect_fail "Instanz ohne instances-Eintrag" "instances"
+restore "$C/settings.conf"
+
+# J: Der Eintrag zeigt auf eine config-Datei, die es nicht gibt. Das Modul
+# liefe dann mit leerer Konfiguration - also voellig wirkungslos, ohne dass
+# irgendetwas meckert.
+sed -i 's/^  config: shellprocess-cleanup.conf/  config: gibtsnicht.conf/' \
+    "$C/settings.conf"
+expect_fail "Instanz-config fehlt" "gibtsnicht.conf"
+restore "$C/settings.conf"
+
 echo
 echo "=== Gegenprobe: unveraenderte Konfiguration darf NICHT anschlagen ==="
 if python3 "$CHECK" >/dev/null 2>&1; then

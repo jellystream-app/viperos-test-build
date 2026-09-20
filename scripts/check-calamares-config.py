@@ -87,7 +87,39 @@ if user != boot_user:
     sys.exit(1)
 print(f"  Live-Benutzer einheitlich: {user}")
 
-# 5. Branding: der Farbblock heisst 'style', nicht 'colors'.
+# 5. Benannte Modul-Instanzen muessen aufloesen.
+#
+# Eine Instanz "shellprocess@cleanup" in der Sequenz braucht einen Eintrag
+# unter "instances:", und die dort genannte config-Datei muss existieren.
+# Fehlt der Eintrag, kennt Calamares den Namen nicht; fehlt die Datei,
+# laeuft das Modul mit leerer Konfiguration. Beides faellt sonst erst im
+# gebooteten ISO auf - und beim Aufraeumschritt hiesse das: das
+# installierte System behaelt ein Installer-Symbol, das ins Leere zeigt.
+instances = {}
+for inst in settings.get("instances", []):
+    key = f"{inst.get('module')}@{inst.get('id')}"
+    instances[key] = inst.get("config")
+
+for step in exec_phase:
+    if "@" not in step:
+        continue
+    if step not in instances:
+        print(f"::error::Sequenz nennt '{step}', aber es gibt keinen "
+              f"passenden Eintrag unter 'instances:'.")
+        print("  Calamares wuerde den Schritt nicht finden.")
+        sys.exit(1)
+    conf = instances[step]
+    if not conf:
+        print(f"::error::Instanz '{step}' nennt keine config-Datei.")
+        sys.exit(1)
+    if not (cal / "modules" / conf).exists():
+        print(f"::error::Instanz '{step}' verweist auf modules/{conf}, "
+              f"das fehlt.")
+        print("  Das Modul liefe mit leerer Konfiguration.")
+        sys.exit(1)
+    print(f"  Instanz OK: {step} -> modules/{conf}")
+
+# 6. Branding: der Farbblock heisst 'style', nicht 'colors'.
 brand = next((d for f, d in docs.items() if f.name == "branding.desc"), None)
 if brand is not None:
     if "colors" in brand:

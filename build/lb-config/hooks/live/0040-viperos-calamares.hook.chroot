@@ -80,6 +80,16 @@ echo "  Logo und Symbol erzeugt"
 
 # Der Installer laeuft ueber pkexec; die Policy dafuer liefert calamares
 # selbst (/usr/share/polkit-1/actions/com.github.calamares.calamares.policy).
+# TryExec ist hier kein Beiwerk, sondern die Absicherung gegen ein totes
+# Symbol: diese Datei gehoert keinem Paket, ueberlebt also die Installation -
+# waehrend packages.conf calamares aus dem Zielsystem entfernt. Ohne TryExec
+# bliebe im Anwendungsmenue ein Eintrag "ViperOS installieren" stehen, dessen
+# "pkexec calamares" ins Leere greift.
+#
+# Die Spezifikation formuliert TryExec bewusst weich ("the entry may be
+# ignored"), GNOME blendet den Eintrag aber aus, wenn die Datei fehlt.
+# Verlassen wird sich darauf trotzdem nicht: der shellprocess-Schritt in der
+# Calamares-Sequenz loescht die Datei im Zielsystem zusaetzlich.
 cat > /usr/share/applications/viperos-installer.desktop << 'EOF'
 [Desktop Entry]
 Type=Application
@@ -87,6 +97,7 @@ Name=ViperOS installieren
 Name[en]=Install ViperOS
 Comment=ViperOS dauerhaft auf diesem Computer installieren
 Comment[en]=Install ViperOS permanently on this computer
+TryExec=calamares
 Exec=pkexec calamares
 Icon=viperos
 Terminal=false
@@ -156,12 +167,30 @@ fi
 # Screenshot zu sehen. Das Attribut liegt in der GIO-Metadatenbank des
 # Benutzers, nicht in der Datei, und laesst sich im Chroot nicht setzen -
 # deshalb erledigt das ein Autostart beim ersten Anmelden.
+#
+# NUR ins Home des Live-Benutzers, NICHT nach /etc/skel:
+#
+#   Calamares legt das neue Konto mit "useradd -m" an (im Modul users
+#   nachgesehen, ohne -k), und useradd -m kopiert /etc/skel in das neue
+#   Home. Ein Symbol in /etc/skel/Desktop landete damit auf dem Desktop
+#   des INSTALLIERTEN Systems - wo packages.conf calamares gerade
+#   entfernt hat. Der Nutzer haette dort ein Symbol "ViperOS
+#   installieren", dessen "pkexec calamares" ins Leere greift.
+#
+# Dieselbe Falle wie bei der gnome-initial-setup-Marke in Hook 0080, nur
+# mit umgekehrtem Vorzeichen: was in /etc/skel liegt, erbt das neue
+# Konto - also gehoert dort nur hinein, was auf dem installierten System
+# noch Sinn ergibt.
 # ----------------------------------------------------------------------
-for target in /etc/skel/Desktop /home/viperos/Desktop; do
-    mkdir -p "$target"
-    cp /usr/share/applications/viperos-installer.desktop "$target/"
-    chmod 0755 "$target/viperos-installer.desktop"
-done
+if [ -d /home/viperos ]; then
+    mkdir -p /home/viperos/Desktop
+    cp /usr/share/applications/viperos-installer.desktop /home/viperos/Desktop/
+    chmod 0755 /home/viperos/Desktop/viperos-installer.desktop
+    echo "  Installer-Symbol im Live-Home (nicht in /etc/skel)"
+fi
+
+# Ein Symbol aus einem frueheren Build entfernen, falls es dort liegt.
+rm -f /etc/skel/Desktop/viperos-installer.desktop
 
 mkdir -p /usr/local/bin /etc/xdg/autostart
 cat > /usr/local/bin/viperos-trust-desktop << 'EOF'

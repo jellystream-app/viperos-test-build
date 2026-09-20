@@ -612,9 +612,10 @@ jobs:
       - name: Verify the Calamares check actually works
         run: |
           # Ein Check, der nichts findet, ist schlimmer als kein Check.
-          # Dieser Schritt baut acht echte Fehler nacheinander ein und
-          # verlangt, dass der Pruefer jeden einzelnen meldet - und dass die
-          # unveraenderte Konfiguration durchgeht.
+          # Dieser Schritt baut zehn echte Fehler nacheinander ein und
+          # verlangt, dass der Pruefer jeden einzelnen meldet - mit dem
+          # jeweils ERWARTETEN Text, nicht nur mit irgendeinem Fehler - und
+          # dass die unveraenderte Konfiguration durchgeht.
           #
           # Die Gegenprobe am Ende ist der wichtigste Teil: eine fruehe
           # Fassung des Testskripts zerstoerte die Einrueckung des Pruefers,
