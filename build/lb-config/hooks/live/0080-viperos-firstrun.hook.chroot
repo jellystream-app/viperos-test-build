@@ -1,7 +1,26 @@
 #!/bin/bash
+# ViperosOS - Erster Start
+#
+# Zwei verschiedene Dinge, die nicht verwechselt werden duerfen:
+#
+#   gnome-initial-setup  laeuft NACH DER INSTALLATION beim ersten Anmelden
+#                        des Kontos, das Calamares angelegt hat. Fragt
+#                        Sprache, Tastatur, Zeitzone, Datenschutz und
+#                        Online-Konten ab. Kommt aus dem Paket, bringt
+#                        seinen Autostart selbst mit - hier wird er nur
+#                        fuer die Live-Sitzung unterdrueckt.
+#
+#   viperos-hub          die eigene Willkommensseite, einmal je Benutzer.
+#
 set -e
 
+echo "[ViperosOS] Richte den ersten Start ein..."
+
 mkdir -p /etc/xdg/autostart /etc/skel/.config/autostart
+
+# ----------------------------------------------------------------------
+# ViperOS Hub beim ersten Anmelden
+# ----------------------------------------------------------------------
 cat > /usr/local/bin/viperos-first-run << 'EOF'
 #!/bin/sh
 set -eu
@@ -24,7 +43,47 @@ OnlyShowIn=GNOME;
 X-GNOME-Autostart-enabled=true
 EOF
 
+# ----------------------------------------------------------------------
+# GNOMEs Ersteinrichtung in der LIVE-Sitzung unterdruecken
+#
+# Das Paket gnome-initial-setup bringt
+#   /etc/xdg/autostart/gnome-initial-setup-first-login.desktop
+# mit, gesteuert durch
+#   AutostartCondition=unless-exists gnome-initial-setup-done
+#
+# Die Bedingung prueft auf eine Datei im XDG-Konfigurationsverzeichnis des
+# Benutzers. Existiert sie, laeuft der Assistent nicht.
+#
+# In der Live-Sitzung waere er falsch: dort ist bereits alles eingerichtet,
+# und ein Assistent, der nach Sprache und Konto fragt, obwohl das Ergebnis
+# beim Neustart verloren geht, verwirrt nur. Nach der INSTALLATION soll er
+# dagegen laufen - und das tut er, weil Calamares ein frisches Konto anlegt,
+# in dessen Verzeichnis diese Marke fehlt.
+#
+# Die Marke kommt deshalb NICHT nach /etc/skel: von dort wuerde sie in genau
+# jenes neue Konto kopiert und der Assistent bliebe auch nach der
+# Installation aus. Sie wird nur im Home des Live-Benutzers gesetzt.
+# ----------------------------------------------------------------------
+if [ -d /home/viperos ]; then
+    mkdir -p /home/viperos/.config
+    touch /home/viperos/.config/gnome-initial-setup-done
+    chown -R viperos:viperos /home/viperos/.config
+    echo "  Ersteinrichtung fuer die Live-Sitzung als erledigt markiert"
+fi
+
+# Gegenpruefen, dass der Assistent ueberhaupt im Image liegt. Fehlt er,
+# startet ein frisch installiertes ViperOS ohne jede Erstkonfiguration -
+# das faellt sonst erst dem Nutzer auf.
+if [ -f /etc/xdg/autostart/gnome-initial-setup-first-login.desktop ]; then
+    echo "  gnome-initial-setup vorhanden (laeuft nach der Installation)"
+else
+    echo "  WARNUNG: gnome-initial-setup fehlt im Image."
+    echo "  Nach der Installation gaebe es keine Ersteinrichtung."
+fi
+
 # nm-applet wird ausschliesslich in 0050-viperos-networkmanager geschrieben.
 # Frueher stand hier eine zweite, abweichende Fassung, die den dortigen
 # Eintrag ueberschrieben hat (dieser Hook laeuft spaeter). Nicht wieder
 # aufnehmen - sonst kehrt das fehlende Netzwerk-Symbol zurueck.
+
+echo "[ViperosOS] Erster Start eingerichtet."

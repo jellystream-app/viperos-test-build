@@ -51,6 +51,11 @@ packages/*/usr/lib/viperos/*     text eol=lf
 *.desktop       text eol=lf
 os-release      text eol=lf
 
+# Python: die Pruefskripte laufen im Preflight unter Linux. Sie faellen zwar
+# schon unter "* text=auto eol=lf" oben, aber explizit ist besser - dieselbe
+# Begruendung wie bei den debian/-Dateien.
+*.py            text eol=lf
+
 # Windows-side launchers keep CRLF (cmd.exe needs it)
 *.bat           text eol=crlf
 *.cmd           text eol=crlf

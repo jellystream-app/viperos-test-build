@@ -13,10 +13,16 @@ on:
     paths:
       - 'build/**'
       - 'scripts/build-iso.sh'
+      # Die Pruefskripte des Preflights. Ohne diese Zeile wuerde eine
+      # Aenderung AN DER PRUEFUNG selbst keinen Lauf ausloesen - der Fehler,
+      # den sie finden soll, bliebe unbemerkt, und die Pruefung faende sich
+      # erst beim naechsten Build-Commit wieder.
+      - 'scripts/check-calamares-config*'
       - '.github/workflows/build-iso.yml'
   pull_request:
     paths:
       - 'build/**'
+      - 'scripts/check-calamares-config*'
       - '.github/workflows/build-iso.yml'
   workflow_dispatch:
     inputs:
@@ -440,6 +446,41 @@ jobs:
           echo "Paketliste OK - loest zu $n Paketen auf."
           echo "PKG_COUNT=$n" >> "$GITHUB_ENV"
 
+          # ----------------------------------------------------------------
+          # Sind die installationskritischen Werkzeuge WIRKLICH dabei?
+          #
+          # Diese Pruefung fehlte und hat einen Fehler bis ins fertige ISO
+          # durchgelassen: Calamares fuehrt squashfs-tools nur als
+          # "Recommends", und der Build laeuft mit --apt-recommends false.
+          # Das Paket lag deshalb nicht im Image, und der Installer brach ab,
+          # NACHDEM der Nutzer Sprache, Tastatur, Partitionen und Konto
+          # durchgeklickt hatte:
+          #   "Failed to find unsquashfs, make sure you have the
+          #    squashfs-tools package installed."
+          # Dasselbe galt fuer mkfs.vfat (dosfstools) - ohne das laesst sich
+          # keine EFI-Partition anlegen, also keine UEFI-Installation.
+          #
+          # Geprueft wird gegen die AUFLOESUNG oben (--no-install-recommends),
+          # nicht gegen die Liste als Text. Nur so faellt auf, wenn ein Paket
+          # zwar dasteht, aber aus dem Satz herausfaellt.
+          #
+          # Die Liste ist bewusst kurz: nur was die Installation VERHINDERT,
+          # nicht was sie huebscher macht.
+          crit_missing=''
+          for p in squashfs-tools dosfstools efibootmgr os-prober \
+                   gnome-initial-setup; do
+            grep -qE "^Inst $p " /tmp/dry.txt || crit_missing="$crit_missing $p"
+          done
+          if [ -n "$crit_missing" ]; then
+            echo "::error::Installationskritische Pakete fehlen:$crit_missing"
+            echo "  Ohne sie bricht der Installer ab oder das installierte"
+            echo "  System startet nicht. Sie muessen AUSDRUECKLICH in"
+            echo "  $LIST stehen - als blosse Recommends von calamares"
+            echo "  werden sie wegen --apt-recommends false nicht installiert."
+            exit 1
+          fi
+          echo "Installations-Werkzeuge vollstaendig (unsquashfs, mkfs.vfat, ...)."
+
       - name: Verify external build dependencies
         run: |
           # Diese Hosts braucht Hook 0015 waehrend des Builds. Sind sie nicht
@@ -533,8 +574,54 @@ jobs:
               # Secure Boot muss wirklich aktiv sein, nicht nur uebergeben.
               grep -rq "LB_UEFI_SECURE_BOOT=\"enable\"" "$T"/config/ \
                 || { echo "::error::Secure Boot nicht aktiviert"; exit 1; }
-              echo "auto/config OK: Trixie + Secure Boot"
+
+              # Der Live-Benutzer muss wirklich in der Kernel-Kommandozeile
+              # landen. live-config meldet sonst seinen eigenen Standard an
+              # ("user" mit Passwort "live"), waehrend motd, Hub und README
+              # "viperos" nennen - drei Stellen, die dem Nutzer ein Passwort
+              # zeigen, das nirgends gilt. Hier wird die ERZEUGTE Datei
+              # geprueft, nicht der Aufruf: nur so faellt auf, wenn lb config
+              # die Option verwirft.
+              grep -rq "username=viperos" "$T"/config/ \
+                || { echo "::error::--bootappend-live setzt kein username=viperos"; exit 1; }
+              # boot=live muss dabei erhalten bleiben: die Option ERSETZT die
+              # Vorgabe, sie ergaenzt sie nicht. Ohne diesen Wert beendet sich
+              # live-config sofort - kein Autologin, keine Locales.
+              grep -rq "boot=live" "$T"/config/ \
+                || { echo "::error::boot=live fehlt in --bootappend-live"; exit 1; }
+              echo "auto/config OK: Trixie + Secure Boot + Live-Benutzer viperos"
             '
+
+      - name: Validate Calamares configuration
+        run: |
+          # Die Installer-Konfiguration liegt seit der Installations-Reparatur
+          # als echte Datei im Repo (vorher: Here-Doc in Hook 0040). Genau
+          # deshalb laesst sie sich ueberhaupt pruefen - drei Fehler waren so
+          # bis ins fertige ISO gekommen:
+          #   - der Farbblock hiess "colors:" statt "style:" (wirkungslos)
+          #   - "slideshow:" verwies auf eine show.qml, die nie kopiert wurde
+          #   - "removeuser" fehlte in der Sequenz, wodurch das Live-Konto mit
+          #     dem dokumentierten Passwort die Installation ueberlebte
+          #
+          # Das Pruefskript liegt als Datei vor und nicht als Here-Doc hier,
+          # damit es lokal genauso laufen kann wie in CI:
+          #   python3 scripts/check-calamares-config.py
+          sudo apt-get install -y --no-install-recommends python3-yaml >/dev/null
+          python3 scripts/check-calamares-config.py
+
+      - name: Verify the Calamares check actually works
+        run: |
+          # Ein Check, der nichts findet, ist schlimmer als kein Check.
+          # Dieser Schritt baut acht echte Fehler nacheinander ein und
+          # verlangt, dass der Pruefer jeden einzelnen meldet - und dass die
+          # unveraenderte Konfiguration durchgeht.
+          #
+          # Die Gegenprobe am Ende ist der wichtigste Teil: eine fruehe
+          # Fassung des Testskripts zerstoerte die Einrueckung des Pruefers,
+          # woraufhin JEDER Testfall anschlug - mit IndentationError statt
+          # mit dem gesuchten Fehler. Ohne Gegenprobe haette das wie ein
+          # tadellos arbeitender Test ausgesehen.
+          bash scripts/check-calamares-config-tests.sh
 
       - name: Validate dconf settings
         run: |
@@ -803,9 +890,16 @@ jobs:
           if [ "$mib" -lt 700 ]; then
             echo "::error::ISO ist nur ${mib} MB - der Build ist unvollstaendig"; exit 1
           fi
-          # Release-Assets sind auf 2 GiB pro Datei begrenzt.
+          # GitHub-Release-Assets sind auf 2 GiB pro Datei begrenzt. Das ist
+          # hier KEIN Fehler: die ISO wird ueber einen eigenen Server
+          # verteilt, GitHub dient nur als Ablage fuer Testlaeufe. Der Hinweis
+          # steht trotzdem da, damit ein "release: true" nicht ueberraschend
+          # abbricht.
           if [ "$bytes" -gt $((2 * 1024 * 1024 * 1024)) ]; then
-            echo "::warning::ISO ist ${mib} MB und ueberschreitet das 2-GiB-Limit fuer Release-Assets"
+            echo "Hinweis: ISO ist ${mib} MB, mehr als die 2 GiB, die ein"
+            echo "GitHub-Release-Asset tragen kann. Fuer die Verteilung ueber"
+            echo "einen eigenen Server ist das ohne Belang; ein Lauf mit"
+            echo "release=true wuerde beim Hochladen aber scheitern."
           fi
 
           # Bootfaehigkeit pruefen: El-Torito-Katalog und die Partitionstabelle
@@ -845,10 +939,14 @@ jobs:
           path: |
             output/viperos-2.0-amd64.iso
             output/viperos-2.0-amd64.iso.sha256
-          # Hinweis: Der Free-Plan hat nur 500 MB Artifact-Speicher. Eine ~1.8 GB
-          # ISO passt dort nicht dauerhaft, daher kurze Aufbewahrung. Fuer
-          # dauerhafte Ablage den Workflow mit release=true starten - Releases
-          # sind unbegrenzt (max. 2 GiB je Datei).
+          # Kurze Aufbewahrung, weil der Free-Plan nur 500 MB Artifact-Speicher
+          # hat und die ISO bei ~2.8 GB liegt. Sie ist hier zum Herunterladen
+          # und Weitergeben an den eigenen Server gedacht, nicht zur Ablage.
+          #
+          # Ein Release ist fuer diese ISO kein Ausweg: Release-Assets tragen
+          # hoechstens 2 GiB je Datei. Wer dauerhaft auf GitHub ablegen will,
+          # muesste die Paketliste kuerzen - Messwerte dazu stehen in
+          # live-test/size-candidates.sh.
           retention-days: 5
           compression-level: 0   # ISO ist bereits zstd-komprimiert
           if-no-files-found: error

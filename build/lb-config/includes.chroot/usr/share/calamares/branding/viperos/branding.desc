@@ -1,0 +1,76 @@
+# Erscheinungsbild des ViperOS-Installers
+#
+# ----------------------------------------------------------------------
+# Was hier frueher falsch war
+#
+# Diese Datei entstand bis dahin in Hook 0040 als Here-Doc und hatte zwei
+# Fehler, die beide dazu fuehrten, dass der Installer nicht nach ViperOS
+# aussah:
+#
+#   1. Der Farbblock hiess "colors:". Calamares kennt diesen Schluessel
+#      nicht - er heisst "style:" (nachgesehen in Calamares' eigener
+#      branding/default/branding.desc). Die Sidebar blieb deshalb in der
+#      Standardfarbe #292F34.
+#
+#   2. Der Hook kopierte vorher /usr/share/calamares/branding/debian/ als
+#      Grundlage. Dieses Verzeichnis existiert nicht: Debian liefert sein
+#      Branding unter /etc/calamares/branding/debian/. Der Kopierschritt lief
+#      dank "[ -d ]"-Pruefung stumm ins Leere, wodurch show.qml fehlte -
+#      waehrend "slideshow:" darauf verwies.
+#
+# Deshalb liegt das Branding jetzt als echte Datei im Repository statt als
+# Text in einem Shell-Skript: so ist es lesbar, versionierbar und der
+# Preflight kann es als YAML pruefen.
+# ----------------------------------------------------------------------
+---
+componentName: viperos
+
+# "Willkommen beim ViperOS-Installer" statt "Willkommen bei ViperOS".
+welcomeStyleCalamares: true
+welcomeExpandingLogo: true
+
+windowExpanding: normal
+windowSize: 800px,580px
+windowPlacement: center
+
+sidebar: widget
+navigation: widget
+
+strings:
+    productName:         ViperOS
+    shortProductName:    ViperOS
+    version:             "2.0"
+    shortVersion:        "2.0"
+    versionedName:       ViperOS 2.0
+    shortVersionedName:  ViperOS 2.0
+    # Der Name, unter dem das System im Bootmenue erscheint. Er wird auch
+    # als EFI-Bootloader-ID benutzt (Leerzeichen und Schraegstriche werden
+    # dabei ersetzt), siehe bootloader/main.py: efi_label().
+    bootloaderEntryName: ViperOS
+    productUrl:          https://radionet.app/
+    supportUrl:          https://radionet.app/
+    releaseNotesUrl:     https://github.com/jellystream-app/viperos-test-build/releases
+
+images:
+    productLogo:         viperos-logo.png
+    productIcon:         viperos-icon.png
+
+# ----------------------------------------------------------------------
+# Farben - der Schluessel heisst "style", nicht "colors".
+#
+# Es sind bewusst nur die vier Sidebar-Farben gesetzt; alles andere folgt
+# der Qt-Palette. Die Werte entsprechen dem Dark-Glass-Thema des Desktops
+# (#101827 Hintergrund, #55a5f7 Akzent) - dieselben Farben wie im Hub.
+# ----------------------------------------------------------------------
+style:
+    SidebarBackground:        "#101827"
+    SidebarText:              "#e7eef9"
+    SidebarTextCurrent:       "#ffffff"
+    SidebarBackgroundCurrent: "#1b2e4d"
+
+# Kein "slideshow:"-Eintrag.
+#
+# Die Diashow waehrend des Kopierens ist optional. Ein Eintrag, der auf eine
+# nicht vorhandene show.qml zeigt, fuehrt nur zu einer leeren Flaeche und
+# einer Warnung im Log - genau das war vorher der Fall. Ohne den Schluessel
+# zeigt Calamares stattdessen seine eigene Fortschrittsanzeige.

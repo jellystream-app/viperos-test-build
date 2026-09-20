@@ -1,13 +1,56 @@
 #!/bin/bash
+# ViperosOS - Installer einrichten
+#
+# ----------------------------------------------------------------------
+# Was in diesem Hook NICHT mehr steht
+#
+# Die Konfiguration des Installers liegt seit dieser Aenderung als echte
+# Dateien im Repository, nicht mehr als Here-Docs hier:
+#
+#   includes.chroot/etc/calamares/settings.conf          Ablauf und Module
+#   includes.chroot/etc/calamares/modules/*.conf         Einzelmodule
+#   includes.chroot/usr/share/calamares/branding/viperos/ Erscheinungsbild
+#
+# Grund: als Text in einem Shell-Skript liess sich nichts davon pruefen. Die
+# alte Fassung hatte zwei Fehler, die deshalb bis ins gebootete ISO kamen -
+# ein Farbblock namens "colors:" statt "style:", und ein Kopierbefehl fuer
+# /usr/share/calamares/branding/debian/, ein Verzeichnis, das es gar nicht
+# gibt (Debian liefert sein Branding unter /etc/calamares/branding/). Beides
+# scheiterte stumm. Als Datei im Repo prueft der Preflight sie jetzt als YAML.
+#
+# Hier bleibt nur, was sich nicht als Datei ablegen laesst: die beiden
+# Bildchen werden erzeugt, und Debians Installer-Eintraege werden entfernt.
+# ----------------------------------------------------------------------
+
 set -e
 
-brand_root=/usr/share/calamares/branding
-mkdir -p "$brand_root/viperos"
+echo "[ViperosOS] Richte Installer ein..."
 
-if [ -d "$brand_root/debian" ]; then
-    cp -a "$brand_root/debian/." "$brand_root/viperos/"
-fi
+brand_root=/usr/share/calamares/branding/viperos
 
+# Gegenpruefen, dass die Konfiguration aus includes.chroot angekommen ist.
+# Fehlt sie, startet Calamares mit Debians Vorgaben - ohne das
+# removeuser-Modul, also mit einem Live-Konto, das die Installation
+# ueberlebt. Das darf nicht stumm passieren.
+for f in /etc/calamares/settings.conf \
+         /etc/calamares/modules/removeuser.conf \
+         "$brand_root/branding.desc"; do
+    if [ ! -f "$f" ]; then
+        echo "  FEHLER: $f fehlt."
+        echo "  Wurde includes.chroot nach config/ kopiert? Siehe die"
+        echo "  Kopierliste im Build-Workflow."
+        exit 1
+    fi
+done
+echo "  Konfiguration vorhanden (settings.conf, removeuser.conf, branding.desc)"
+
+# ----------------------------------------------------------------------
+# Logo und Symbol erzeugen
+#
+# Bleibt im Hook: es sind Binaerdateien, die sich aus wenigen Zeilen Code
+# ableiten lassen. python3-pil steht dafuer in der Paketliste.
+# ----------------------------------------------------------------------
+mkdir -p "$brand_root"
 python3 - << 'PYEOF'
 from PIL import Image, ImageDraw
 for name in ("viperos-icon.png", "viperos-logo.png"):
@@ -17,35 +60,7 @@ for name in ("viperos-icon.png", "viperos-logo.png"):
     draw.line((62, 68, 96, 132, 134, 68), fill=(231, 238, 249), width=10, joint="curve")
     image.save("/usr/share/calamares/branding/viperos/" + name)
 PYEOF
-cat > "$brand_root/viperos/branding.desc" << 'EOF'
----
-componentName: viperos
-welcomeStyleCalamares: true
-welcomeExpandingLogo: true
-strings:
-    productName: ViperOS
-    shortProductName: ViperOS
-    version: 2.0
-    shortVersion: 2.0
-    versionedName: ViperOS 2.0
-    shortVersionedName: ViperOS 2.0
-    bootloaderEntryName: ViperOS
-    productUrl: https://radionet.app/
-    supportUrl: https://radionet.app/
-    releaseNotesUrl: https://github.com/jellystream-app/viperos-test-build/releases
-images:
-    productLogo: viperos-logo.png
-    productIcon: viperos-icon.png
-colors:
-    sidebarBackground: "#101827"
-    sidebarText: "#e7eef9"
-    sidebarTextSelect: "#ffffff"
-    sidebarTextHighlight: "#55a5f7"
-EOF
-
-if [ -f /etc/calamares/settings.conf ]; then
-    sed -i 's/^branding: .*/branding: viperos/' /etc/calamares/settings.conf
-fi
+echo "  Logo und Symbol erzeugt"
 
 # ----------------------------------------------------------------------
 # Hinweis: Authentication Agent
@@ -96,6 +111,41 @@ if [ -f /usr/share/applications/calamares.desktop ]; then
     printf 'NoDisplay=true\n' >> /usr/share/applications/calamares.desktop
 fi
 echo "  Debian-Installersymbol entfernt"
+
+# ----------------------------------------------------------------------
+# Debians gschema-Override neutralisieren
+#
+# 96_calamares-settings-debian.gschema.override setzt favorite-apps auf
+# Debians Liste - angefuehrt von calamares-install-debian.desktop, dazu
+# evolution, rhythmbox, gnome-software und yelp, die gar nicht im Image
+# sind. Leere Stellen im Dock waeren die Folge.
+#
+# Zur Einordnung, damit die Tragweite nicht ueberschaetzt wird: ViperOS
+# setzt favorite-apps in der dconf-Systemdatenbank (viperos-settings,
+# /etc/dconf/db/local.d/00-viperos), und die schlaegt jeden Schema-Default -
+# eine gschema.override liefert nur den Wert, der gilt, wenn KEINE
+# Datenbank im Profil etwas sagt (dconf(7): Profil-Datenbanken zuerst,
+# Schema-Default zuletzt). Die Datei ist also bereits wirkungslos,
+# solange die dconf-Vorgaben greifen.
+#
+# Sie wird trotzdem geleert, weil sie sonst als stille Zeitbombe liegen
+# bleibt: faellt die dconf-Datenbank einmal aus - ein Typfehler verwirft
+# die GANZE Datei, siehe der Hinweis in 00-viperos - traegt das Dock
+# ploetzlich Debians Liste samt Verweis auf einen Installer, den das
+# installierte System gar nicht mehr hat.
+#
+# Geleert statt geloescht: die Datei gehoert dpkg. Ein leerer Inhalt
+# ueberlebt ein Paketupdate besser als ein fehlender Pfad. Dasselbe
+# Vorgehen wie bei desktop-base in Hook 0065.
+# ----------------------------------------------------------------------
+gso=/usr/share/glib-2.0/schemas/96_calamares-settings-debian.gschema.override
+if [ -f "$gso" ]; then
+    : > "$gso"
+    if command -v glib-compile-schemas >/dev/null 2>&1; then
+        glib-compile-schemas /usr/share/glib-2.0/schemas/ >/dev/null 2>&1 || true
+    fi
+    echo "  Debians favorite-apps-Override geleert"
+fi
 
 # ----------------------------------------------------------------------
 # Desktop-Verknuepfung fuer den ViperOS-Installer
@@ -151,3 +201,5 @@ X-GNOME-Autostart-Phase=Applications
 EOF
 
 chown -R viperos:viperos /home/viperos 2>/dev/null || true
+
+echo "[ViperosOS] Installer eingerichtet."

@@ -8,6 +8,26 @@ echo "[ViperosOS] Finale Konfiguration & Cleanup..."
 # APT Cache leeren
 apt-get clean
 rm -rf /var/lib/apt/lists/*
+
+# ----------------------------------------------------------------------
+# Die Recommends-Sperre des Builds aufheben
+#
+# auto/config setzt --apt-recommends false. live-build schreibt daraufhin
+#   /etc/apt/apt.conf.d/00recommends:  APT::Install-Recommends "false";
+# und loescht die Datei am Ende NUR WIEDER, wenn die Option "true" war
+# (chroot_apt, remove-Pfad: 'if [ "${LB_APT_RECOMMENDS}" = "true" ]').
+#
+# Bei "false" bleibt sie also liegen - im Chroot, und damit in der squashfs
+# und im installierten System. Folge: auf jedem installierten ViperOS wuerde
+# "apt install <paket>" dauerhaft ohne Recommends arbeiten. Pakete kaemen
+# ohne ihre empfohlenen Bestandteile, und niemand wuerde die Ursache in einer
+# Build-Option vermuten.
+#
+# Die Sperre hat ihren Zweck beim Bauen erfuellt (sie haelt das Image klein);
+# fuer das fertige System gilt wieder Debians Standard. Dieser Hook laeuft
+# nach der gesamten Paketinstallation, das Bauen ist davon also unberuehrt.
+rm -f /etc/apt/apt.conf.d/00recommends
+echo "  Recommends-Sperre des Builds entfernt (gilt wieder Debian-Standard)"
 rm -rf /tmp/*
 rm -rf /var/tmp/*
 

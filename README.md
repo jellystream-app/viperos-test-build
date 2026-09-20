@@ -161,6 +161,41 @@ wanted it or not. The Hub has a button to install it on demand. Audio runs on Pi
 Trixie. The ISO includes `shim-signed`, so it boots on machines with Secure
 Boot enabled.
 
+## Installing
+
+The live session logs in automatically as **`viperos`** (password `viperos`).
+That account exists only while the system runs from the medium.
+
+Install with the **Install ViperOS** icon on the desktop, or from the Hub. The
+installer is Calamares; its configuration lives in
+`build/lb-config/includes.chroot/etc/calamares/` and its appearance in
+`.../usr/share/calamares/branding/viperos/`.
+
+Two details are load-bearing and easy to break:
+
+**The live user's name is defined in three places and they must agree.**
+`auto/config` passes `username=viperos` to live-config, hook 0010 creates the
+account, and `modules/removeuser.conf` names it so Calamares deletes it from
+the installed system. Without the boot parameter, live-config falls back to its
+own default — `user` with password `live` — and every documented credential is
+wrong. Without `removeuser`, the live account survives installation with a
+publicly documented password. The preflight fails the build if the three
+disagree.
+
+**The installer's tools are not pulled in automatically.** The build runs with
+`--apt-recommends false`, and Calamares lists `squashfs-tools` only as a
+*Recommends*. Missing, it aborts after the user has entered everything, with
+`Failed to find unsquashfs`. The same applies to `dosfstools`, which provides
+the `mkfs.vfat` needed for the EFI partition of any UEFI install. These
+packages are therefore listed explicitly in
+`package-lists/viperos-desktop.list.chroot`, and the preflight asserts they
+survive dependency resolution. Do not tidy them away.
+
+After installation, GNOME's initial setup runs once for the newly created
+account and asks for language, keyboard, timezone, privacy and online accounts.
+It is suppressed in the live session, where it would only offer to configure a
+system that disappears at reboot.
+
 ## Editing rules
 
 Every file that runs inside WSL or the chroot must keep **LF** line endings;
@@ -185,6 +220,21 @@ reports every file as `0755`.
 Before distribution, boot the ISO in both UEFI and legacy BIOS virtual
 machines, run the installer, and verify that the installed account is
 presented instead of the temporary live account.
+
+The preflight proves the installer *can* work; only a real run proves it
+*does*. Check all of these on the installed system:
+
+- `id viperos` says "no such user" — the live account was removed
+- `/etc/sudoers.d/viperos-live` is gone, and `/etc/motd` no longer prints
+  live credentials
+- on a UEFI machine, `efibootmgr` lists a **ViperOS** entry and the ESP is
+  mounted at `/boot/efi`
+- GNOME's initial setup appeared at the first login and does not return at
+  the second
+- if another OS shares the disk, it is in the GRUB menu (this is what
+  `os-prober` is for; it is easy to lose to `apt autoremove`)
+- `apt install --dry-run <anything>` proposes its recommended packages —
+  proving the build's Recommends lock did not leak into the image
 
 Then verify the point of 2.0 actually works: on the installed system, run
 `apt update` and confirm the ViperOS repository is read without a signature

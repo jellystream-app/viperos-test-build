@@ -13,6 +13,33 @@
 #
 # --uefi-secure-boot enable bindet shim-signed/grub-efi-amd64-signed ein, damit
 # das Live-ISO auch auf Rechnern mit aktiviertem Secure Boot startet.
+#
+# --bootappend-live setzt den Namen des Live-Benutzers. Das ist KEINE Kosmetik:
+# die Anmeldung macht live-config, und dessen Vorgabe ist "user" mit Passwort
+# "live" (/usr/lib/live/init-config.sh: LIVE_USERNAME="user"). Ohne diese
+# Zeile meldete sich das Live-System also als "user" an, waehrend /etc/motd,
+# der ViperOS Hub und das README alle "viperos/viperos" nannten - drei
+# Stellen, die dem Nutzer ein Passwort zeigten, das nirgends galt.
+#
+# Der Benutzer selbst entsteht in Hook 0010. live-config legt ihn deshalb
+# nicht noch einmal an: 0030-user-setup steigt aus, wenn der Name schon in
+# /etc/passwd steht. Von live-config kommt nur die automatische Anmeldung
+# (0080-gdm3) - und die braucht genau diesen Namen.
+#
+# Wer den Namen hier aendert, muss ihn an drei weiteren Stellen aendern:
+# Hook 0010 (useradd), /etc/calamares/modules/removeuser.conf (sonst bleibt
+# das Live-Konto auf dem installierten System stehen) und die Texte in
+# Hook 0010 sowie im README.
+#
+# Die gesamte Zeile ersetzt live-builds Vorgabe, sie ergaenzt sie nicht.
+# Deshalb stehen "boot=live components quiet splash" wieder mit drin - das
+# ist genau die Voreinstellung aus live-builds configuration.sh.
+#
+# Entscheidend davon ist "boot=live": ohne diesen Wert in /proc/cmdline
+# beendet sich live-config sofort (Main() prueft darauf und macht exit 0).
+# Dann gaebe es weder Autologin noch eingerichtete Locales. "components"
+# laesst alle Komponenten laufen - das ist ohnehin die Vorgabe und steht nur
+# der Vollstaendigkeit halber da.
 
 set -e
 
@@ -28,6 +55,7 @@ lb config noauto \
     --uefi-secure-boot enable \
     --debian-installer live \
     --debian-installer-gui false \
+    --bootappend-live "boot=live components quiet splash username=viperos hostname=viperos user-fullname=ViperOS" \
     --image-name    "viperos-2.0" \
     --iso-application "ViperOS 2.0" \
     --iso-publisher "ViperosOS Project" \

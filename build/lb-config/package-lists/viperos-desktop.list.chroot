@@ -221,3 +221,66 @@ p7zip-full
 zenity
 calamares
 calamares-settings-debian
+
+# ============================================================
+# --- Installations-Werkzeuge ---
+#
+# ACHTUNG: Diese Zeilen sehen ueberfluessig aus, sind es aber NICHT.
+#
+# auto/config setzt --apt-recommends false. Damit installiert der Build
+# ausschliesslich harte Depends. Alles, was Calamares nur als "Recommends"
+# oder "Suggests" fuehrt, landet NICHT im Image - auch dann nicht, wenn der
+# Installer ohne das Programm nachweislich abbricht.
+#
+# Wer hier aufraeumt, macht ViperOS uninstallierbar. Vor dem Entfernen einer
+# Zeile pruefen, ob irgendein Paket sie HART verlangt:
+#   apt-cache rdepends --installed --no-recommends --no-suggests <paket>
+#
+# squashfs-tools liefert unsquashfs. Calamares' Modul "unpackfs" bricht ohne
+# das Programm ab, BEVOR es etwas schreibt - und zwar erst, nachdem der
+# Nutzer Sprache, Tastatur, Partitionen und Konto durchgeklickt hat:
+#   "Failed to find unsquashfs, make sure you have the squashfs-tools
+#    package installed."
+# Das war der Hauptgrund, warum sich ViperOS nicht installieren liess.
+squashfs-tools
+# dosfstools liefert mkfs.vfat. Damit wird die EFI-Systempartition angelegt -
+# noetig fuer JEDE UEFI-Installation, also praktisch jeden Rechner ab 2014.
+dosfstools
+# Schreibt den UEFI-Booteintrag in die Firmware.
+efibootmgr
+# GRUBs EFI-Hilfsdateien werden ueber mtools in die FAT-Partition gelegt.
+mtools
+# Ohne diese Werkzeuge bietet der Installer die Dateisysteme nicht an und
+# erkennt vorhandene Fremdpartitionen nicht - eine Windows-Partition sieht
+# dann aus wie unbelegter Platz.
+btrfs-progs
+ntfs-3g
+exfatprogs
+xfsprogs
+# os-prober erkennt parallel installierte Systeme (typisch Windows) und
+# traegt sie ins GRUB-Menue ein.
+#
+# Es IST ein hartes Depends von calamares, muss hier aber trotzdem stehen:
+# Calamares entfernt sich am Ende der Installation selbst (packages.conf),
+# und das anschliessende "apt-get --purge autoremove" nimmt alles mit, was
+# nur noch als seine Abhaengigkeit dastand. grub-common fuehrt os-prober
+# lediglich als Recommends, holt es also nicht zurueck. Steht es dagegen in
+# dieser Liste, gilt es als manuell installiert und ueberlebt.
+#
+# Ohne os-prober findet "update-grub" ein daneben installiertes Windows
+# nicht mehr - der Rechner startet dann scheinbar nur noch ViperOS.
+os-prober
+
+# --- Ersteinrichtung nach der Installation ---
+#
+# GNOMEs Assistent fragt beim ersten Anmelden Sprache, Tastatur, Zeitzone,
+# Datenschutz und Online-Konten ab. Er bringt seinen Autostart selbst mit
+# (/etc/xdg/autostart/gnome-initial-setup-first-login.desktop) und laeuft
+# wegen "AutostartCondition=unless-exists gnome-initial-setup-done" genau
+# einmal - es ist also nichts zu verdrahten.
+#
+# In der Live-Sitzung stoert er nicht: dort meldet live-config den Benutzer
+# viperos automatisch an, und fuer den markiert Hook 0080 den Assistenten als
+# erledigt. Gezeigt wird er dem Konto, das Calamares bei der Installation
+# anlegt.
+gnome-initial-setup
